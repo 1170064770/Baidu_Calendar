@@ -24,9 +24,13 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
+        shell: bash
         run: |
-          npm install --legacy-peer-deps
-          npm install -D electron electron-builder --legacy-peer-deps
+          # 移除跨平台冲突的 lock 文件，避免 npm 跳过 Windows 专属原生二进制依赖 (npm cli #4828)
+          rm -f package-lock.json
+          npm install --force
+          # 显式安装 Vite 8 / Rolldown 的 Windows x64 原生模块及打包工具
+          npm install -D @rolldown/binding-win32-x64-msvc electron electron-builder --force
 
       - name: Build Web Application
         run: npm run build
