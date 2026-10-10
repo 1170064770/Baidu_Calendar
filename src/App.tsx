@@ -5,13 +5,12 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CalendarWidget } from './components/CalendarWidget';
-import { SystemTray } from './components/SystemTray';
 import { WindowsExportModal } from './components/WindowsExportModal';
 import { WidgetSettings } from './types/calendar';
 
 const DEFAULT_SETTINGS: WidgetSettings = {
-  isLocked: true, // 默认无感固定在桌面左上角
-  position: { x: 28, y: 28 }, // 左上角坐标 (28, 28)
+  isLocked: false, // 默认解锁，便于用户首次启动立即自由拖动定位
+  position: { x: 28, y: 28 }, // 默认左上角坐标 (28, 28)
   opacity: 0.98,
   blurEffect: true,
   autoStart: true, // 开机自启动
@@ -37,6 +36,7 @@ export default function App() {
   // Dragging state
   const isDraggingRef = useRef(false);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const lastScreenPosRef = useRef({ x: 0, y: 0 });
   const [isCurrentlyDragging, setIsCurrentlyDragging] = useState(false);
 
   // Save settings on update
@@ -55,43 +55,92 @@ export default function App() {
   // Snap to Top-Left
   const handleResetTopLeft = useCallback(() => {
     handleUpdateSettings({ position: { x: 28, y: 28 }, isLocked: true });
-    if ((window as any).electronAPI?.resetTopLeft) {
-      (window as any).electronAPI.resetTopLeft();
+    const api = (window as any).electronAPI;
+    if (api?.resetTopLeft) {
+      api.resetTopLeft();
     }
   }, [handleUpdateSettings]);
 
   // Toggle Lock
   const handleToggleLock = useCallback(() => {
-    handleUpdateSettings({ isLocked: !settings.isLocked });
+    const nextLocked = !settings.isLocked;
+    handleUpdateSettings({ isLocked: nextLocked });
+    const api = (window as any).electronAPI;
+    if (api?.setLockState) {
+      api.setLockState(nextLocked);
+    }
   }, [settings.isLocked, handleUpdateSettings]);
+
+  // Change Opacity
+  const handleChangeOpacity = useCallback((val: number) => {
+    handleUpdateSettings({ opacity: val });
+    const api = (window as any).electronAPI;
+    if (api?.setOpacity) {
+      api.setOpacity(val);
+    }
+  }, [handleUpdateSettings]);
+
+  // Toggle Auto-Start
+  const handleToggleAutoStart = useCallback(() => {
+    const nextVal = !settings.autoStart;
+    handleUpdateSettings({ autoStart: nextVal });
+    const api = (window as any).electronAPI;
+    if (api?.setAutoStart) {
+      api.setAutoStart(nextVal);
+    }
+  }, [settings.autoStart, handleUpdateSettings]);
+
+  // Toggle Always on Top
+  const handleToggleAlwaysOnTop = useCallback(() => {
+    const nextVal = !settings.alwaysOnTop;
+    handleUpdateSettings({ alwaysOnTop: nextVal });
+    const api = (window as any).electronAPI;
+    if (api?.setAlwaysOnTop) {
+      api.setAlwaysOnTop(nextVal);
+    }
+  }, [settings.alwaysOnTop, handleUpdateSettings]);
 
   // Listen to native Electron tray events if running in Electron
   useEffect(() => {
     const api = (window as any).electronAPI;
     if (api) {
-      api.onToggleLock?.(() => {
-        handleToggleLock();
+      api.onToggleLock?.((locked?: boolean) => {
+        if (typeof locked === 'boolean') {
+          handleUpdateSettings({ isLocked: locked });
+        } else {
+          handleToggleLock();
+        }
       });
       api.onResetPosition?.(() => {
         handleResetTopLeft();
       });
     }
-  }, [handleToggleLock, handleResetTopLeft]);
+  }, [handleToggleLock, handleResetTopLeft, handleUpdateSettings]);
 
   // Mouse drag handlers
   const handleMouseDown = (e: React.MouseEvent) => {
     if (settings.isLocked) return;
 
-    // Only allow drag if clicking on the drag handle
     const target = e.target as HTMLElement;
+    // Do not trigger drag if clicking buttons, inputs or links
+    if (target.closest('button') || target.closest('input') || target.closest('a')) {
+      return;
+    }
+
+    // Only allow drag if clicking within drag handle bar
     const isDragHandle = target.closest('[data-drag-handle="true"]');
     if (!isDragHandle) return;
 
     isDraggingRef.current = true;
     setIsCurrentlyDragging(true);
+
     dragOffsetRef.current = {
       x: e.clientX - settings.position.x,
       y: e.clientY - settings.position.y,
+    };
+    lastScreenPosRef.current = {
+      x: e.screenX,
+      y: e.screenY,
     };
   };
 
@@ -99,10 +148,22 @@ export default function App() {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDraggingRef.current) return;
 
+      const api = (window as any).electronAPI;
+
+      // 1. Electron 原生窗口物理移动支持
+      if (api?.moveWindowBy && (lastScreenPosRef.current.x !== 0 || lastScreenPosRef.current.y !== 0)) {
+        const dx = e.screenX - lastScreenPosRef.current.x;
+        const dy = e.screenY - lastScreenPosRef.current.y;
+        if (dx !== 0 || dy !== 0) {
+          api.moveWindowBy(dx, dy);
+          lastScreenPosRef.current = { x: e.screenX, y: e.screenY };
+        }
+      }
+
+      // 2. Web 界面内的流畅坐标更新
       let newX = e.clientX - dragOffsetRef.current.x;
       let newY = e.clientY - dragOffsetRef.current.y;
 
-      // Screen containment boundaries
       const widgetWidth = 460;
       const widgetHeight = 630;
       const maxX = Math.max(20, window.innerWidth - widgetWidth - 16);
@@ -127,7 +188,6 @@ export default function App() {
       if (isDraggingRef.current) {
         isDraggingRef.current = false;
         setIsCurrentlyDragging(false);
-        // Persist final position
         setSettings((current) => {
           try {
             localStorage.setItem('baidu_calendar_widget_settings', JSON.stringify(current));
@@ -147,7 +207,7 @@ export default function App() {
 
   return (
     <div
-      className="relative w-screen h-screen overflow-hidden select-none font-sans text-slate-800 bg-slate-900/10"
+      className="relative w-screen h-screen overflow-hidden select-none font-sans text-slate-800 bg-transparent"
       onMouseDown={handleMouseDown}
     >
       {/* Draggable & Lockable Calendar Widget Window */}
@@ -165,18 +225,15 @@ export default function App() {
           onToggleLock={handleToggleLock}
           onResetTopLeft={handleResetTopLeft}
           opacity={settings.opacity}
+          onChangeOpacity={handleChangeOpacity}
+          autoStart={settings.autoStart}
+          onToggleAutoStart={handleToggleAutoStart}
+          alwaysOnTop={settings.alwaysOnTop}
+          onToggleAlwaysOnTop={handleToggleAlwaysOnTop}
           blurEffect={settings.blurEffect}
           onOpenExportGuide={() => setIsExportModalOpen(true)}
         />
       </div>
-
-      {/* Windows Style System Tray in bottom-right */}
-      <SystemTray
-        settings={settings}
-        onUpdateSettings={handleUpdateSettings}
-        onResetTopLeft={handleResetTopLeft}
-        onOpenGuide={() => setIsExportModalOpen(true)}
-      />
 
       {/* Windows Deployment & Export Modal */}
       <WindowsExportModal
