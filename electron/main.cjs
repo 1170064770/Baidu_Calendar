@@ -5,7 +5,6 @@ const fs = require('fs');
 let mainWindow = null;
 let tray = null;
 let isLocked = true;
-let isAlwaysOnBottom = true;
 let isQuitting = false;
 
 // 配置文件路径，持久保存位置和设置
@@ -19,7 +18,7 @@ function loadConfig() {
   } catch (e) {
     // ignore
   }
-  return { x: 28, y: 28, opacity: 0.98, isLocked: true, isAlwaysOnBottom: true };
+  return { x: 28, y: 28, opacity: 0.98, isLocked: true };
 }
 
 function saveConfig(cfg) {
@@ -35,7 +34,6 @@ function saveConfig(cfg) {
 function createWindow() {
   const config = loadConfig();
   isLocked = config.isLocked ?? true;
-  isAlwaysOnBottom = config.isAlwaysOnBottom ?? (config.isAlwaysOnTop !== undefined ? !config.isAlwaysOnTop : true);
 
   mainWindow = new BrowserWindow({
     width: 485,
@@ -84,6 +82,14 @@ function createWindow() {
     }
   });
 
+  mainWindow.on('show', () => {
+    mainWindow?.webContents.send('toggle-visibility', true);
+  });
+
+  mainWindow.on('hide', () => {
+    mainWindow?.webContents.send('toggle-visibility', false);
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -107,36 +113,17 @@ function applyLockState(locked) {
   updateTrayMenu();
 }
 
-function setPositionPreset(preset) {
-  if (!mainWindow) return;
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
-  const winWidth = 485;
-  const winHeight = 675;
-  let x = 28;
-  let y = 28;
-
-  if (preset === 'top-left') {
-    x = 28;
-    y = 28;
-  } else if (preset === 'top-right') {
-    x = Math.max(28, width - winWidth - 28);
-    y = 28;
-  } else if (preset === 'center') {
-    x = Math.max(28, Math.round((width - winWidth) / 2));
-    y = Math.max(28, Math.round((height - winHeight) / 2));
-  } else if (preset === 'bottom-left') {
-    x = 28;
-    y = Math.max(28, height - winHeight - 28);
-  } else if (preset === 'bottom-right') {
-    x = Math.max(28, width - winWidth - 28);
-    y = Math.max(28, height - winHeight - 28);
+function toggleWindowVisibility() {
+  if (!mainWindow) {
+    createWindow();
+    return;
   }
-
-  mainWindow.setPosition(x, y);
-  saveConfig({ x, y });
-  mainWindow.webContents.send('set-position', { x, y });
-  mainWindow.show();
+  if (mainWindow.isVisible()) {
+    mainWindow.hide();
+  } else {
+    mainWindow.show();
+    mainWindow.focus();
+  }
 }
 
 function updateTrayMenu() {
@@ -151,48 +138,22 @@ function updateTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: '显示小组件',
+      label: '显示/隐藏小组件',
       click: () => {
-        if (!mainWindow) {
-          createWindow();
-        } else {
-          mainWindow.show();
-          mainWindow.focus();
-        }
+        toggleWindowVisibility();
       },
     },
     {
       label: '改变位置',
       submenu: [
         {
-          label: '📌 固定到左上角 (28, 28) (默认)',
-          click: () => setPositionPreset('top-left'),
-        },
-        {
-          label: '📌 固定到右上角',
-          click: () => setPositionPreset('top-right'),
-        },
-        {
-          label: '📌 固定到居中',
-          click: () => setPositionPreset('center'),
-        },
-        {
-          label: '📌 固定到左下角',
-          click: () => setPositionPreset('bottom-left'),
-        },
-        {
-          label: '📌 固定到右下角',
-          click: () => setPositionPreset('bottom-right'),
-        },
-        { type: 'separator' },
-        {
-          label: isLocked ? '🔓 解锁组件交互 (点击开启交互与拖拽)' : '🔓 自由交互与拖拽 (当前已开启)',
+          label: '🔓 解锁以自由拖动改变位置',
           click: () => {
             applyLockState(false);
           },
         },
         {
-          label: isLocked ? '🔒 锁定融入壁纸 (当前已锁定/无法点击)' : '🔒 锁定融入壁纸 (禁止点击/防误触)',
+          label: '🔒 锁定当前位置并融入壁纸',
           click: () => {
             applyLockState(true);
           },
@@ -231,18 +192,6 @@ function updateTrayMenu() {
         });
       },
     },
-    {
-      label: '窗口始终置底',
-      type: 'checkbox',
-      checked: isAlwaysOnBottom,
-      click: (item) => {
-        isAlwaysOnBottom = item.checked;
-        saveConfig({ isAlwaysOnBottom });
-        if (mainWindow) {
-          mainWindow.setAlwaysOnTop(false);
-        }
-      },
-    },
     { type: 'separator' },
     {
       label: '退出应用',
@@ -279,23 +228,21 @@ function createTray() {
   tray.setToolTip('百度日历桌面小组件 (常驻桌面)');
   updateTrayMenu();
 
-  // 单击/双击托盘显示日历
+  // 单击/双击托盘显示/隐藏日历
   tray.on('click', () => {
-    if (mainWindow) {
-      mainWindow.show();
-      mainWindow.focus();
-    }
+    toggleWindowVisibility();
   });
 
   tray.on('double-click', () => {
-    if (mainWindow) {
-      mainWindow.show();
-      mainWindow.focus();
-    }
+    toggleWindowVisibility();
   });
 }
 
 // 监听渲染进程 IPC 消息
+ipcMain.on('toggle-visibility', () => {
+  toggleWindowVisibility();
+});
+
 ipcMain.on('move-window-by', (_event, { dx, dy }) => {
   if (mainWindow && !isLocked) {
     const [curX, curY] = mainWindow.getPosition();
@@ -317,23 +264,6 @@ ipcMain.on('set-opacity', (_event, val) => {
   setOpacity(val);
 });
 
-ipcMain.on('set-always-on-bottom', (_event, val) => {
-  isAlwaysOnBottom = Boolean(val);
-  if (mainWindow) {
-    mainWindow.setAlwaysOnTop(false);
-  }
-  saveConfig({ isAlwaysOnBottom });
-  updateTrayMenu();
-});
-
-ipcMain.on('set-always-on-top', (_event, val) => {
-  isAlwaysOnBottom = !Boolean(val);
-  if (mainWindow) {
-    mainWindow.setAlwaysOnTop(false);
-  }
-  saveConfig({ isAlwaysOnBottom });
-  updateTrayMenu();
-});
 
 ipcMain.on('set-auto-start', (_event, val) => {
   app.setLoginItemSettings({

@@ -8,24 +8,22 @@ import { CalendarWidget } from './components/CalendarWidget';
 import { WindowsExportModal } from './components/WindowsExportModal';
 import { WidgetSettings } from './types/calendar';
 import {
-  Pin,
   Lock,
   Unlock,
   Eye,
+  EyeOff,
   Power,
-  Layers,
   HelpCircle,
   X,
   Compass,
 } from 'lucide-react';
 
 const DEFAULT_SETTINGS: WidgetSettings = {
-  isLocked: true, // 默认固定在左上角
-  position: { x: 28, y: 28 }, // 默认左上角坐标 (28, 28)
+  isLocked: true, // 默认锁定位置
+  position: { x: 28, y: 28 }, // 默认位置坐标 (28, 28)
   opacity: 0.98,
   blurEffect: true,
   autoStart: true, // 开机自启动
-  alwaysOnBottom: true, // 核心需求：窗口始终置底 (贴合桌面底层)
 };
 
 export default function App() {
@@ -35,9 +33,6 @@ export default function App() {
       const saved = localStorage.getItem('baidu_calendar_widget_settings');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.alwaysOnBottom === undefined) {
-          parsed.alwaysOnBottom = parsed.alwaysOnTop !== undefined ? !parsed.alwaysOnTop : true;
-        }
         return { ...DEFAULT_SETTINGS, ...parsed };
       }
     } catch (e) {
@@ -46,6 +41,7 @@ export default function App() {
     return DEFAULT_SETTINGS;
   });
 
+  const [isVisible, setIsVisible] = useState(true);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isTrayMenuOpen, setIsTrayMenuOpen] = useState(false);
 
@@ -70,43 +66,17 @@ export default function App() {
     });
   }, []);
 
-  // Position Presets
-  const handleSetPositionPreset = useCallback(
-    (preset: 'top-left' | 'top-right' | 'center' | 'bottom-left' | 'bottom-right') => {
-      const winWidth = 460;
-      const winHeight = 630;
-      const screenW = window.innerWidth;
-      const screenH = window.innerHeight;
-
-      let x = 28;
-      let y = 28;
-
-      if (preset === 'top-left') {
-        x = 28;
-        y = 28;
-      } else if (preset === 'top-right') {
-        x = Math.max(28, screenW - winWidth - 28);
-        y = 28;
-      } else if (preset === 'center') {
-        x = Math.max(28, Math.round((screenW - winWidth) / 2));
-        y = Math.max(28, Math.round((screenH - winHeight) / 2));
-      } else if (preset === 'bottom-left') {
-        x = 28;
-        y = Math.max(28, screenH - winHeight - 28);
-      } else if (preset === 'bottom-right') {
-        x = Math.max(28, screenW - winWidth - 28);
-        y = Math.max(28, screenH - winHeight - 28);
-      }
-
-      handleUpdateSettings({ position: { x, y } });
-
+  // Toggle Visibility (显示/隐藏小组件)
+  const handleToggleVisibility = useCallback(() => {
+    setIsVisible((prev) => {
+      const nextVal = !prev;
       const api = (window as any).electronAPI;
-      if (api?.setWindowPosition) {
-        api.setWindowPosition(x, y);
+      if (api?.toggleVisibility) {
+        api.toggleVisibility();
       }
-    },
-    [handleUpdateSettings]
-  );
+      return nextVal;
+    });
+  }, []);
 
   // Toggle Lock State
   const handleToggleLock = useCallback(() => {
@@ -140,19 +110,6 @@ export default function App() {
     }
   }, [settings.autoStart, handleUpdateSettings]);
 
-  // Toggle Always on Bottom (置底)
-  const handleToggleAlwaysOnBottom = useCallback(() => {
-    const nextVal = !settings.alwaysOnBottom;
-    handleUpdateSettings({ alwaysOnBottom: nextVal });
-    const api = (window as any).electronAPI;
-    if (api?.setAlwaysOnBottom) {
-      api.setAlwaysOnBottom(nextVal);
-    } else if (api?.setAlwaysOnTop) {
-      // In older preload, opposite of always-on-top
-      api.setAlwaysOnTop(false);
-    }
-  }, [settings.alwaysOnBottom, handleUpdateSettings]);
-
   // Listen to native Electron tray events if running in Electron
   useEffect(() => {
     const api = (window as any).electronAPI;
@@ -164,11 +121,18 @@ export default function App() {
           handleToggleLock();
         }
       });
+      api.onToggleVisibility?.((vis?: boolean) => {
+        if (typeof vis === 'boolean') {
+          setIsVisible(vis);
+        } else {
+          setIsVisible((prev) => !prev);
+        }
+      });
       api.onResetPosition?.(() => {
-        handleSetPositionPreset('top-left');
+        handleUpdateSettings({ position: { x: 28, y: 28 } });
       });
     }
-  }, [handleToggleLock, handleSetPositionPreset, handleUpdateSettings]);
+  }, [handleToggleLock, handleUpdateSettings]);
 
   // Close tray menu on click outside
   useEffect(() => {
@@ -283,6 +247,8 @@ export default function App() {
       {/* Pure Calendar Widget Window (Zero Title Bar) */}
       <div
         className={`absolute z-30 transition-transform ${
+          !isVisible ? 'hidden pointer-events-none' : ''
+        } ${
           isCurrentlyDragging ? 'scale-[1.01] shadow-2xl duration-0' : 'duration-150'
         } ${settings.isLocked ? 'pointer-events-none' : 'pointer-events-auto'}`}
         style={{
@@ -326,7 +292,35 @@ export default function App() {
             </div>
 
             <div className="space-y-3 text-xs">
-              {/* 核心功能：改变位置子菜单与快捷预设 */}
+              {/* 显示/隐藏小组件 */}
+              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center gap-2">
+                  {isVisible ? (
+                    <Eye className="w-4 h-4 text-blue-600" />
+                  ) : (
+                    <EyeOff className="w-4 h-4 text-slate-400" />
+                  )}
+                  <div>
+                    <div className="font-semibold text-slate-900">显示/隐藏小组件</div>
+                    <div className="text-[10px] text-slate-500">
+                      {isVisible ? '组件当前正常显示在桌面' : '组件当前已隐藏 (右键桌面可唤回)'}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleToggleVisibility}
+                  className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
+                    isVisible
+                      ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  {isVisible ? '隐藏' : '显示'}
+                </button>
+              </div>
+
+              {/* 改变位置 */}
               <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
                 <div className="flex items-center justify-between text-slate-800 font-semibold">
                   <div className="flex items-center gap-1.5">
@@ -334,72 +328,36 @@ export default function App() {
                     <span>改变位置</span>
                   </div>
                   <span className="text-[10px] text-slate-500 font-normal">
-                    {settings.isLocked ? '已锁定 (融入壁纸/无法点击)' : '已解锁 (可自由交互/拖拽)'}
+                    {settings.isLocked ? '已锁定 (融入壁纸)' : '已解锁 (可自由拖动)'}
                   </span>
                 </div>
 
-                {/* 5大预设位置 */}
-                <div className="grid grid-cols-3 gap-1 text-[11px]">
-                  <button
-                    onClick={() => handleSetPositionPreset('top-left')}
-                    className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 transition-colors text-center font-medium"
-                    title="固定到左上角 (28, 28)"
-                  >
-                    左上角 (默认)
-                  </button>
-                  <button
-                    onClick={() => handleSetPositionPreset('top-right')}
-                    className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 transition-colors text-center font-medium"
-                    title="固定到右上角"
-                  >
-                    右上角
-                  </button>
-                  <button
-                    onClick={() => handleSetPositionPreset('center')}
-                    className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 transition-colors text-center font-medium"
-                    title="固定到屏幕居中"
-                  >
-                    屏幕居中
-                  </button>
-                  <button
-                    onClick={() => handleSetPositionPreset('bottom-left')}
-                    className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 transition-colors text-center font-medium"
-                    title="固定到左下角"
-                  >
-                    左下角
-                  </button>
-                  <button
-                    onClick={() => handleSetPositionPreset('bottom-right')}
-                    className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 transition-colors text-center font-medium col-span-2"
-                    title="固定到右下角"
-                  >
-                    右下角
-                  </button>
+                <div className="text-[11px] text-slate-500 leading-relaxed">
+                  {settings.isLocked
+                    ? '组件当前固定在桌面。点击下方按钮解锁后，即可在屏幕上自由拖拽小组件改变位置。'
+                    : '当前已解锁交互，您可以直接在桌面上拖拽小组件到任意位置，调整完成后点击锁定。'}
                 </div>
 
-                {/* 解锁自由拖拽 / 锁定固定 */}
-                <div className="pt-1.5 border-t border-slate-200/60">
-                  <button
-                    onClick={handleToggleLock}
-                    className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg font-medium transition-colors ${
-                      settings.isLocked
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                    }`}
-                  >
-                    {settings.isLocked ? (
-                      <>
-                        <Unlock className="w-3.5 h-3.5" />
-                        <span>解锁组件交互 (可点击日期/拖动)</span>
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="w-3.5 h-3.5" />
-                        <span>锁定并融入壁纸 (无法点击/防误触)</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                <button
+                  onClick={handleToggleLock}
+                  className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg font-medium transition-colors ${
+                    settings.isLocked
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  }`}
+                >
+                  {settings.isLocked ? (
+                    <>
+                      <Unlock className="w-3.5 h-3.5" />
+                      <span>解锁以拖拽改变位置</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>锁定位置并融入壁纸</span>
+                    </>
+                  )}
+                </button>
               </div>
 
               {/* 透明度调节 */}
@@ -454,27 +412,6 @@ export default function App() {
                     type="checkbox"
                     checked={settings.autoStart}
                     onChange={handleToggleAutoStart}
-                    className="sr-only peer"
-                  />
-                  <div className="w-8 h-4 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-
-              {/* 窗口始终置底 */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-indigo-600" />
-                  <div>
-                    <div className="font-semibold text-slate-900">窗口始终置底</div>
-                    <div className="text-[10px] text-slate-500">贴合桌面底层，不遮挡其他应用窗口</div>
-                  </div>
-                </div>
-
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.alwaysOnBottom}
-                    onChange={handleToggleAlwaysOnBottom}
                     className="sr-only peer"
                   />
                   <div className="w-8 h-4 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
