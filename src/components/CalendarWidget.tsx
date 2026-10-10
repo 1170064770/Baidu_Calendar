@@ -24,7 +24,12 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
   opacity,
   blurEffect,
 }) => {
-  // Current view year & month (default 2026年 10月 as in the user's screenshot)
+  const today = useMemo(() => new Date(), []);
+  const thisYear = today.getFullYear();
+  const thisMonth = today.getMonth() + 1;
+  const thisDay = today.getDate();
+
+  // Current view year & month (default to 2026年 10月 as set in mock/initial state or today)
   const [currentYear, setCurrentYear] = useState<number>(2026);
   const [currentMonth, setCurrentMonth] = useState<number>(10);
 
@@ -53,33 +58,90 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
   // Huangli Detail Modal
   const [isHuangliModalOpen, setIsHuangliModalOpen] = useState(false);
 
-  // Statutory holidays for current year
+  // Statutory holidays for current view year
   const statutoryHolidays = useMemo(
     () => getStatutoryHolidays(currentYear),
     [currentYear]
   );
 
-  // Refs for clicking outside dropdowns
+  // Refs for outside click detection and auto-scrolling
   const holidayRef = useRef<HTMLDivElement>(null);
   const yearRef = useRef<HTMLDivElement>(null);
   const monthRef = useRef<HTMLDivElement>(null);
 
+  const yearListRef = useRef<HTMLDivElement>(null);
+  const currentYearItemRef = useRef<HTMLButtonElement>(null);
+
+  const monthListRef = useRef<HTMLDivElement>(null);
+  const currentMonthItemRef = useRef<HTMLButtonElement>(null);
+
+  // Year options for dropdown (1970 to 2050)
+  const yearOptions = useMemo(() => {
+    const list: number[] = [];
+    for (let y = 1970; y <= 2050; y++) {
+      list.push(y);
+    }
+    return list;
+  }, []);
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (holidayRef.current && !holidayRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (isHolidayDropdownOpen && holidayRef.current && !holidayRef.current.contains(target)) {
         setIsHolidayDropdownOpen(false);
       }
-      if (yearRef.current && !yearRef.current.contains(e.target as Node)) {
+      if (isYearDropdownOpen && yearRef.current && !yearRef.current.contains(target)) {
         setIsYearDropdownOpen(false);
       }
-      if (monthRef.current && !monthRef.current.contains(e.target as Node)) {
+      if (isMonthDropdownOpen && monthRef.current && !monthRef.current.contains(target)) {
         setIsMonthDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isHolidayDropdownOpen, isYearDropdownOpen, isMonthDropdownOpen]);
+
+  // Auto-scroll Year dropdown to position at currentYear / thisYear when opened
+  useEffect(() => {
+    if (isYearDropdownOpen) {
+      const timer = setTimeout(() => {
+        if (currentYearItemRef.current) {
+          currentYearItemRef.current.scrollIntoView({
+            block: 'center',
+            behavior: 'instant' as ScrollBehavior,
+          });
+        } else if (yearListRef.current) {
+          const targetYear = currentYear || thisYear;
+          const idx = yearOptions.indexOf(targetYear);
+          if (idx !== -1) {
+            yearListRef.current.scrollTop = Math.max(0, idx * 32 - 96);
+          }
+        }
+      }, 10);
+      return () => clearTimeout(timer);
+    }
+  }, [isYearDropdownOpen, currentYear, thisYear, yearOptions]);
+
+  // Auto-scroll Month dropdown to position at currentMonth when opened
+  useEffect(() => {
+    if (isMonthDropdownOpen) {
+      const timer = setTimeout(() => {
+        if (currentMonthItemRef.current) {
+          currentMonthItemRef.current.scrollIntoView({
+            block: 'center',
+            behavior: 'instant' as ScrollBehavior,
+          });
+        } else if (monthListRef.current) {
+          const idx = currentMonth - 1;
+          if (idx >= 0) {
+            monthListRef.current.scrollTop = Math.max(0, idx * 32 - 96);
+          }
+        }
+      }, 10);
+      return () => clearTimeout(timer);
+    }
+  }, [isMonthDropdownOpen, currentMonth]);
 
   // Fetch month data when year or month changes
   useEffect(() => {
@@ -112,7 +174,6 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
     );
 
     if (firstDayIndex === -1) {
-      // Fallback: simple slice or return list
       return almanacList.slice(0, 42);
     }
 
@@ -165,23 +226,45 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
     );
   }, [selectedDate]);
 
-  // Handle month navigation
+  // Handle month navigation (prev/next month)
   const handlePrevMonth = () => {
+    let newY = currentYear;
+    let newM = currentMonth - 1;
     if (currentMonth === 1) {
-      setCurrentYear((y) => y - 1);
+      newY = currentYear - 1;
+      newM = 12;
+      setCurrentYear(newY);
       setCurrentMonth(12);
     } else {
-      setCurrentMonth((m) => m - 1);
+      setCurrentMonth(newM);
     }
+    const daysInNewMonth = new Date(newY, newM, 0).getDate();
+    setSelectedDate((prev) => ({
+      year: newY,
+      month: newM,
+      day: Math.min(prev.day, daysInNewMonth),
+    }));
+    setSelectedHolidayLabel('假期');
   };
 
   const handleNextMonth = () => {
+    let newY = currentYear;
+    let newM = currentMonth + 1;
     if (currentMonth === 12) {
-      setCurrentYear((y) => y + 1);
+      newY = currentYear + 1;
+      newM = 1;
+      setCurrentYear(newY);
       setCurrentMonth(1);
     } else {
-      setCurrentMonth((m) => m + 1);
+      setCurrentMonth(newM);
     }
+    const daysInNewMonth = new Date(newY, newM, 0).getDate();
+    setSelectedDate((prev) => ({
+      year: newY,
+      month: newM,
+      day: Math.min(prev.day, daysInNewMonth),
+    }));
+    setSelectedHolidayLabel('假期');
   };
 
   // Jump to today
@@ -195,6 +278,9 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
     setCurrentMonth(m);
     setSelectedDate({ year: y, month: m, day: d });
     setSelectedHolidayLabel('假期');
+    setIsHolidayDropdownOpen(false);
+    setIsYearDropdownOpen(false);
+    setIsMonthDropdownOpen(false);
   };
 
   // Select a statutory holiday from dropdown
@@ -210,18 +296,36 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
     setIsHolidayDropdownOpen(false);
   };
 
-  // Year options for dropdown (1970 to 2050)
-  const yearOptions = useMemo(() => {
-    const list: number[] = [];
-    for (let y = 1970; y <= 2050; y++) {
-      list.push(y);
-    }
-    return list;
-  }, []);
+  // Select a year from Year dropdown
+  const handleSelectYear = (y: number) => {
+    setCurrentYear(y);
+    const daysInNewMonth = new Date(y, currentMonth, 0).getDate();
+    setSelectedDate((prev) => ({
+      year: y,
+      month: currentMonth,
+      day: Math.min(prev.day, daysInNewMonth),
+    }));
+    setSelectedHolidayLabel('假期');
+    setIsYearDropdownOpen(false);
+  };
+
+  // Select a month from Month dropdown
+  const handleSelectMonth = (m: number) => {
+    setCurrentMonth(m);
+    const daysInNewMonth = new Date(currentYear, m, 0).getDate();
+    setSelectedDate((prev) => ({
+      year: currentYear,
+      month: m,
+      day: Math.min(prev.day, daysInNewMonth),
+    }));
+    setSelectedHolidayLabel('假期');
+    setIsMonthDropdownOpen(false);
+  };
 
   return (
     <>
       <div
+        data-widget-container="true"
         className={`relative w-[460px] max-w-[95vw] rounded-[24px] transition-all select-none duration-200 ${
           blurEffect ? 'backdrop-blur-xl' : ''
         } ${
@@ -238,13 +342,19 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
         <div className="p-5">
           {/* Top Controls: 假期下拉、年份、月份切换、今天按钮 */}
           <div
+            data-no-drag="true"
             className="flex items-center justify-between gap-2 mb-4"
             style={{ WebkitAppRegion: 'no-drag' } as any}
           >
             {/* 假期 Dropdown */}
             <div className="relative" ref={holidayRef}>
               <button
-                onClick={() => setIsHolidayDropdownOpen(!isHolidayDropdownOpen)}
+                type="button"
+                onClick={() => {
+                  setIsHolidayDropdownOpen((prev) => !prev);
+                  setIsYearDropdownOpen(false);
+                  setIsMonthDropdownOpen(false);
+                }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-200/90 rounded-xl hover:border-slate-300 hover:bg-slate-50/80 transition-colors shadow-2xs"
               >
                 <span>{selectedHolidayLabel}</span>
@@ -252,9 +362,22 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
               </button>
 
               {isHolidayDropdownOpen && (
-                <div className="absolute left-0 top-full mt-1.5 w-36 bg-white rounded-xl shadow-xl border border-slate-100 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150">
+                <div
+                  data-no-drag="true"
+                  style={{ WebkitAppRegion: 'no-drag' } as any}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onWheel={(e) => e.stopPropagation()}
+                  className="dropdown-scroll absolute left-0 top-full mt-1.5 w-40 max-h-64 overflow-y-auto overscroll-contain bg-white rounded-xl shadow-xl border border-slate-100 py-1.5 z-50 select-auto animate-in fade-in zoom-in-95 duration-150"
+                >
                   <button
-                    onClick={() => {
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      setSelectedHolidayLabel('假期');
+                      setIsHolidayDropdownOpen(false);
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setSelectedHolidayLabel('假期');
                       setIsHolidayDropdownOpen(false);
                     }}
@@ -266,16 +389,24 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
                   {statutoryHolidays.map((h) => (
                     <button
                       key={h.id}
-                      onClick={() => handleSelectHoliday(h)}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        handleSelectHoliday(h);
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectHoliday(h);
+                      }}
                       className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-blue-50/70 transition-colors ${
                         selectedHolidayLabel === h.name
                           ? 'text-blue-600 font-semibold bg-blue-50/40'
                           : 'text-slate-700'
                       }`}
                     >
-                      <span>{h.name}</span>
+                      <span className="font-medium">{h.name}</span>
                       <span className="text-[10px] text-slate-400">
-                        {h.month}/{h.day}
+                        {h.month}月{h.day}日
                       </span>
                     </button>
                   ))}
@@ -288,7 +419,12 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
               {/* Year Dropdown */}
               <div className="relative" ref={yearRef}>
                 <button
-                  onClick={() => setIsYearDropdownOpen(!isYearDropdownOpen)}
+                  type="button"
+                  onClick={() => {
+                    setIsYearDropdownOpen((prev) => !prev);
+                    setIsHolidayDropdownOpen(false);
+                    setIsMonthDropdownOpen(false);
+                  }}
                   className="flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-200/90 rounded-xl hover:border-slate-300 hover:bg-slate-50/80 transition-colors shadow-2xs"
                 >
                   <span>{currentYear}年</span>
@@ -296,21 +432,39 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
                 </button>
 
                 {isYearDropdownOpen && (
-                  <div className="absolute left-0 top-full mt-1.5 w-28 max-h-56 overflow-y-auto bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-40 animate-in fade-in zoom-in-95 duration-150">
+                  <div
+                    ref={yearListRef}
+                    data-no-drag="true"
+                    style={{ WebkitAppRegion: 'no-drag' } as any}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onWheel={(e) => e.stopPropagation()}
+                    className="dropdown-scroll absolute left-0 top-full mt-1.5 w-32 max-h-56 overflow-y-auto overscroll-contain bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-50 select-auto animate-in fade-in zoom-in-95 duration-150"
+                  >
                     {yearOptions.map((y) => (
                       <button
                         key={y}
-                        onClick={() => {
-                          setCurrentYear(y);
-                          setIsYearDropdownOpen(false);
+                        type="button"
+                        ref={y === currentYear ? currentYearItemRef : undefined}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          handleSelectYear(y);
                         }}
-                        className={`w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50/70 transition-colors ${
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectYear(y);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-blue-50/80 transition-colors ${
                           currentYear === y
-                            ? 'text-blue-600 font-semibold bg-blue-50/40'
+                            ? 'text-blue-600 font-bold bg-blue-50/60'
                             : 'text-slate-700'
                         }`}
                       >
-                        {y}年
+                        <span>{y}年</span>
+                        {y === thisYear && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-sm bg-blue-100 text-blue-700 font-medium">
+                            今年
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -320,6 +474,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
               {/* Month Navigator: < 10月 > */}
               <div className="flex items-center bg-white border border-slate-200/90 rounded-xl shadow-2xs">
                 <button
+                  type="button"
                   onClick={handlePrevMonth}
                   className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-l-xl transition-colors"
                   title="上一月"
@@ -329,7 +484,12 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
 
                 <div className="relative" ref={monthRef}>
                   <button
-                    onClick={() => setIsMonthDropdownOpen(!isMonthDropdownOpen)}
+                    type="button"
+                    onClick={() => {
+                      setIsMonthDropdownOpen((prev) => !prev);
+                      setIsHolidayDropdownOpen(false);
+                      setIsYearDropdownOpen(false);
+                    }}
                     className="flex items-center gap-0.5 px-2 py-1 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors"
                   >
                     <span>{currentMonth}月</span>
@@ -337,21 +497,39 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
                   </button>
 
                   {isMonthDropdownOpen && (
-                    <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 w-24 max-h-56 overflow-y-auto bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-40 animate-in fade-in zoom-in-95 duration-150">
+                    <div
+                      ref={monthListRef}
+                      data-no-drag="true"
+                      style={{ WebkitAppRegion: 'no-drag' } as any}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onWheel={(e) => e.stopPropagation()}
+                      className="dropdown-scroll absolute left-1/2 -translate-x-1/2 top-full mt-1.5 w-28 max-h-56 overflow-y-auto overscroll-contain bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-50 select-auto animate-in fade-in zoom-in-95 duration-150"
+                    >
                       {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                         <button
                           key={m}
-                          onClick={() => {
-                            setCurrentMonth(m);
-                            setIsMonthDropdownOpen(false);
+                          type="button"
+                          ref={m === currentMonth ? currentMonthItemRef : undefined}
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            handleSelectMonth(m);
                           }}
-                          className={`w-full text-center px-3 py-1.5 text-xs hover:bg-blue-50/70 transition-colors ${
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectMonth(m);
+                          }}
+                          className={`w-full text-center px-3 py-1.5 text-xs flex items-center justify-between hover:bg-blue-50/80 transition-colors ${
                             currentMonth === m
-                              ? 'text-blue-600 font-semibold bg-blue-50/40'
+                              ? 'text-blue-600 font-bold bg-blue-50/60'
                               : 'text-slate-700'
                           }`}
                         >
-                          {m}月
+                          <span>{m}月</span>
+                          {currentYear === thisYear && m === thisMonth && (
+                            <span className="text-[10px] px-1 py-0.2 rounded-sm bg-blue-100 text-blue-700 font-medium">
+                              本月
+                            </span>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -359,6 +537,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
                 </div>
 
                 <button
+                  type="button"
                   onClick={handleNextMonth}
                   className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 rounded-r-xl transition-colors"
                   title="下一月"
@@ -370,6 +549,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
 
             {/* 今天 Button */}
             <button
+              type="button"
               onClick={handleGoToday}
               className="px-3.5 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-200/90 rounded-xl hover:border-slate-300 hover:bg-slate-50 transition-colors shadow-2xs"
             >
@@ -378,7 +558,11 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
           </div>
 
           {/* Weekday Row Header: 一, 二, 三, 四, 五, 六, 日 */}
-          <div className="grid grid-cols-7 mb-2 text-center text-xs font-medium">
+          <div
+            data-no-drag="true"
+            style={{ WebkitAppRegion: 'no-drag' } as any}
+            className="grid grid-cols-7 mb-2 text-center text-xs font-medium"
+          >
             <div className="text-slate-600 py-1">一</div>
             <div className="text-slate-600 py-1">二</div>
             <div className="text-slate-600 py-1">三</div>
@@ -389,7 +573,11 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
           </div>
 
           {/* Calendar 42-cell Grid */}
-          <div className="grid grid-cols-7 gap-y-1 gap-x-1">
+          <div
+            data-no-drag="true"
+            style={{ WebkitAppRegion: 'no-drag' } as any}
+            className="grid grid-cols-7 gap-y-1 gap-x-1"
+          >
             {isLoading ? (
               <div className="col-span-7 h-64 flex items-center justify-center text-slate-400 text-xs">
                 正在同步百度开放数据平台日历...
@@ -456,6 +644,8 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
                 return (
                   <div
                     key={`${item.year}-${item.month}-${item.day}-${index}`}
+                    data-no-drag="true"
+                    style={{ WebkitAppRegion: 'no-drag' } as any}
                     onClick={() => {
                       setSelectedDate({
                         year: dayYear,
@@ -505,7 +695,11 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
 
           {/* Bottom Card: Selected Day Huangli, Yi/Ji, Countdown */}
           {selectedDayAlmanac && (
-            <div className="mt-4 bg-[#f7f9fa] border border-[#eaedf1] rounded-2xl p-3.5 text-slate-800 transition-colors">
+            <div
+              data-no-drag="true"
+              style={{ WebkitAppRegion: 'no-drag' } as any}
+              className="mt-4 bg-[#f7f9fa] border border-[#eaedf1] rounded-2xl p-3.5 text-slate-800 transition-colors"
+            >
               <div
                 className="flex items-start justify-between gap-3 cursor-pointer group"
                 onClick={() => setIsHuangliModalOpen(true)}
@@ -517,7 +711,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
                   </div>
                   <div className="text-xs text-slate-700 font-medium mt-0.5">
                     {selectedDayAlmanac.gzYear}年
-                    {selectedDayAlmanac.animal}
+                    {selectedDayAlmanac.animal}年
                   </div>
                 </div>
 
@@ -546,6 +740,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
 
                 {/* Right Chevron Button */}
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsHuangliModalOpen(true);

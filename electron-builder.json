@@ -22,6 +22,7 @@
     ]
   },
   "nsis": {
+    "artifactName": "BaiduCalendarDesktop-Setup-v${version}.${ext}",
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
@@ -29,6 +30,6 @@
     "shortcutName": "百度日历桌面小组件"
   },
   "portable": {
-    "artifactName": "BaiduCalendarDesktop-Portable-${version}.exe"
+    "artifactName": "BaiduCalendarDesktop-Portable-v${version}.${ext}"
   }
 }

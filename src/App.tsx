@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 const DEFAULT_SETTINGS: WidgetSettings = {
-  isLocked: true, // 默认锁定位置
+  isLocked: false, // 默认可交互，可在系统托盘中一键锁定融入壁纸
   position: { x: 28, y: 28 }, // 默认位置坐标 (28, 28)
   opacity: 0.98,
   blurEffect: true,
@@ -150,13 +150,21 @@ export default function App() {
     if (settings.isLocked) return;
 
     const target = e.target as HTMLElement;
-    // Don't drag when clicking buttons, inputs, links or dropdown items
+    // Don't drag when clicking buttons, inputs, links, dropdown items, or modals
     if (
       target.closest('button') ||
       target.closest('input') ||
       target.closest('a') ||
-      target.closest('[data-no-drag="true"]')
+      target.closest('[data-no-drag="true"]') ||
+      target.closest('.dropdown-scroll') ||
+      target.closest('[role="dialog"]')
     ) {
+      return;
+    }
+
+    // Only drag when clicking inside the calendar widget card
+    const widgetCard = target.closest('[data-widget-container="true"]');
+    if (!widgetCard) {
       return;
     }
 

@@ -32,6 +32,32 @@ jobs:
           # 显式安装 Vite 8 / Rolldown 的 Windows x64 原生模块及打包工具
           npm install -D @rolldown/binding-win32-x64-msvc electron electron-builder --force
 
+      - name: Generate Release Tag
+        id: tag
+        shell: bash
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" && "${{ github.ref_name }}" != "" ]]; then
+            RAW_TAG="${{ github.ref_name }}"
+          else
+            RAW_TAG="v1.0.${{ github.run_number }}"
+          fi
+          if [[ "$RAW_TAG" =~ ^v ]]; then
+            TAG_NAME="$RAW_TAG"
+            VERSION_NUM="${RAW_TAG#v}"
+          else
+            TAG_NAME="v$RAW_TAG"
+            VERSION_NUM="$RAW_TAG"
+          fi
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "version_num=${VERSION_NUM}" >> $GITHUB_OUTPUT
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Sync package version
+        shell: bash
+        run: |
+          npm --no-git-tag-version version ${{ steps.tag.outputs.version_num }}
+
       - name: Build Web Application
         run: npm run build
 
@@ -41,22 +67,36 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Normalize Release Asset Names
+        shell: bash
+        run: |
+          TAG="${{ steps.tag.outputs.tag_name }}"
+          echo "Standardizing release asset names to ${TAG}..."
+          cd release
+          for f in *.exe; do
+            [ -e "$f" ] || continue
+            case "$f" in
+              *Setup*|*setup*)
+                if [ "$f" != "BaiduCalendarDesktop-Setup-${TAG}.exe" ]; then
+                  mv -f "$f" "BaiduCalendarDesktop-Setup-${TAG}.exe"
+                fi
+                ;;
+              *Portable*|*portable*)
+                if [ "$f" != "BaiduCalendarDesktop-Portable-${TAG}.exe" ]; then
+                  mv -f "$f" "BaiduCalendarDesktop-Portable-${TAG}.exe"
+                fi
+                ;;
+            esac
+          done
+          ls -la
+
       - name: Upload Artifacts (Actions Download)
         uses: actions/upload-artifact@v4
         with:
-          name: BaiduCalendar-Windows-EXE
+          name: BaiduCalendar-Windows-EXE-${{ steps.tag.outputs.tag_name }}
           path: |
             release/*.exe
           retention-days: 30
-
-      - name: Generate Release Tag
-        id: tag
-        shell: bash
-        run: |
-          TAG_NAME="v1.0.${{ github.run_number }}"
-          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -67,12 +107,13 @@ jobs:
             ## 百度日历 Windows 桌面小组件发布
 
             - **触发分支**: `main`
+            - **版本号**: `${{ steps.tag.outputs.tag_name }}`
             - **提交哈希**: `${{ steps.tag.outputs.short_sha }}`
             - **构建时间**: ${{ github.event.head_commit.timestamp || 'Latest' }}
 
-            ### 包含产物
-            - **安装版 (NSIS)**: 支持安装向导、创建桌面与开始菜单快捷方式
-            - **免安装便携版 (Portable)**: 单文件 `.exe`，双击直接运行，可随时无感贴附于桌面左上角壁纸
+            ### 包含产物 (Assets)
+            - **安装版 (NSIS)**: `BaiduCalendarDesktop-Setup-${{ steps.tag.outputs.tag_name }}.exe`
+            - **免安装便携版 (Portable)**: `BaiduCalendarDesktop-Portable-${{ steps.tag.outputs.tag_name }}.exe`
 
             ### 变更信息
             ${{ github.event.head_commit.message || 'Main 分支更新自动构建' }}
@@ -82,3 +123,4 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

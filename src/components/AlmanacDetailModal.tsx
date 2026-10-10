@@ -27,6 +27,8 @@ export const AlmanacDetailModal: React.FC<AlmanacDetailModalProps> = ({
       onClick={onClose}
     >
       <div
+        data-no-drag="true"
+        style={{ WebkitAppRegion: 'no-drag' } as any}
         className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 text-slate-800 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >

@@ -166,14 +166,14 @@ app.whenReady().then(createWindow);
             <div className="space-y-1 text-xs text-slate-700 bg-white p-3 rounded-lg border border-emerald-100">
               <div className="flex items-center gap-1.5 font-medium text-slate-900">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span>BaiduCalendarDesktop-Setup-*.exe (NSIS 标准安装包)</span>
+                <span>BaiduCalendarDesktop-Setup-v1.0.x.exe (NSIS 标准安装包)</span>
               </div>
               <div className="flex items-center gap-1.5 font-medium text-slate-900">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span>BaiduCalendarDesktop-Portable-*.exe (免安装绿色便携单文件)</span>
+                <span>BaiduCalendarDesktop-Portable-v1.0.x.exe (免安装绿色便携单文件)</span>
               </div>
               <div className="text-[11px] text-slate-500 pt-1">
-                可在 GitHub 仓库的 <strong>Actions</strong> 标签页或 <strong>Releases</strong> 页面直接一键下载。
+                可在 GitHub 仓库的 <strong>Releases</strong> 页面 Assets 资源附件或 <strong>Actions</strong> 产物中一键下载。
               </div>
             </div>
           </div>
