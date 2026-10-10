@@ -37,7 +37,7 @@ jobs:
 
       - name: Build Windows EXE with electron-builder
         run: |
-          npx electron-builder --win nsis portable --config electron-builder.json
+          npx electron-builder --win nsis portable --config electron-builder.json --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
