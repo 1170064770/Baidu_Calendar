@@ -4,6 +4,7 @@
   "description": "高度还原百度开放数据平台日历的 Windows 桌面小组件应用",
   "author": "Baidu Calendar Team",
   "version": "1.0.0",
+  "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "tsx server.ts",

@@ -5,29 +5,24 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CalendarWidget } from './components/CalendarWidget';
-import { DesktopControls, WALLPAPERS } from './components/DesktopControls';
-import { WindowsTaskbar } from './components/WindowsTaskbar';
+import { SystemTray } from './components/SystemTray';
 import { WindowsExportModal } from './components/WindowsExportModal';
 import { WidgetSettings } from './types/calendar';
-import { Monitor, Trash2, Calendar, HardDrive } from 'lucide-react';
 
 const DEFAULT_SETTINGS: WidgetSettings = {
-  isLocked: true, // Default pinned to top-left seamlessly as requested
-  position: { x: 28, y: 28 }, // Seamless top-left coordinates
-  opacity: 0.96,
+  isLocked: true, // 默认无感固定在桌面左上角
+  position: { x: 28, y: 28 }, // 左上角坐标 (28, 28)
+  opacity: 0.98,
   blurEffect: true,
-  wallpaperId: 'win11-flow',
-  viewMode: 'desktop',
-  showTaskbar: true,
-  soundEffects: false,
-  autoSnapTopLeft: true,
+  autoStart: true, // 开机自启动
+  alwaysOnTop: false, // 窗口置顶
 };
 
 export default function App() {
   // Load settings from localStorage
   const [settings, setSettings] = useState<WidgetSettings>(() => {
     try {
-      const saved = localStorage.getItem('baidu_calendar_settings');
+      const saved = localStorage.getItem('baidu_calendar_widget_settings');
       if (saved) {
         return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
       }
@@ -49,7 +44,7 @@ export default function App() {
     setSettings((prev) => {
       const updated = { ...prev, ...newPartial };
       try {
-        localStorage.setItem('baidu_calendar_settings', JSON.stringify(updated));
+        localStorage.setItem('baidu_calendar_widget_settings', JSON.stringify(updated));
       } catch (e) {
         // ignore
       }
@@ -60,12 +55,28 @@ export default function App() {
   // Snap to Top-Left
   const handleResetTopLeft = useCallback(() => {
     handleUpdateSettings({ position: { x: 28, y: 28 }, isLocked: true });
+    if ((window as any).electronAPI?.resetTopLeft) {
+      (window as any).electronAPI.resetTopLeft();
+    }
   }, [handleUpdateSettings]);
 
   // Toggle Lock
   const handleToggleLock = useCallback(() => {
     handleUpdateSettings({ isLocked: !settings.isLocked });
   }, [settings.isLocked, handleUpdateSettings]);
+
+  // Listen to native Electron tray events if running in Electron
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (api) {
+      api.onToggleLock?.(() => {
+        handleToggleLock();
+      });
+      api.onResetPosition?.(() => {
+        handleResetTopLeft();
+      });
+    }
+  }, [handleToggleLock, handleResetTopLeft]);
 
   // Mouse drag handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -93,9 +104,9 @@ export default function App() {
 
       // Screen containment boundaries
       const widgetWidth = 460;
-      const widgetHeight = 620;
+      const widgetHeight = 630;
       const maxX = Math.max(20, window.innerWidth - widgetWidth - 16);
-      const maxY = Math.max(20, window.innerHeight - widgetHeight - 56);
+      const maxY = Math.max(20, window.innerHeight - widgetHeight - 16);
 
       newX = Math.max(12, Math.min(newX, maxX));
       newY = Math.max(12, Math.min(newY, maxY));
@@ -119,7 +130,7 @@ export default function App() {
         // Persist final position
         setSettings((current) => {
           try {
-            localStorage.setItem('baidu_calendar_settings', JSON.stringify(current));
+            localStorage.setItem('baidu_calendar_widget_settings', JSON.stringify(current));
           } catch (e) {}
           return current;
         });
@@ -134,62 +145,11 @@ export default function App() {
     };
   }, []);
 
-  // Keyboard shortcut: Press 'L' to toggle lock, 'T' for top-left
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-      if (e.key === 'l' || e.key === 'L') {
-        handleToggleLock();
-      } else if (e.key === 'p' || e.key === 'P') {
-        handleResetTopLeft();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleToggleLock, handleResetTopLeft]);
-
-  // Current wallpaper
-  const activeWallpaper =
-    settings.customWallpaperUrl ||
-    WALLPAPERS.find((w) => w.id === settings.wallpaperId)?.url ||
-    WALLPAPERS[0].url;
-
   return (
     <div
-      className={`relative w-screen h-screen overflow-hidden select-none font-sans text-slate-800 ${
-        settings.viewMode === 'widget-only' ? 'bg-slate-900/90' : ''
-      }`}
-      style={{
-        backgroundImage:
-          settings.viewMode === 'desktop' ? `url(${activeWallpaper})` : undefined,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-      }}
+      className="relative w-screen h-screen overflow-hidden select-none font-sans text-slate-800 bg-slate-900/10"
       onMouseDown={handleMouseDown}
     >
-      {/* Desktop Overlay Tint (Subtle for readability) */}
-      {settings.viewMode === 'desktop' && (
-        <div className="absolute inset-0 bg-black/10 pointer-events-none" />
-      )}
-
-      {/* Floating Control Toolbar */}
-      <DesktopControls
-        settings={settings}
-        onUpdateSettings={handleUpdateSettings}
-        onResetTopLeft={handleResetTopLeft}
-        onOpenExportGuide={() => setIsExportModalOpen(true)}
-      />
-
-      {/* Desktop Icons (Windows 11 style) - only shown when in desktop mode and away from widget */}
-      {settings.viewMode === 'desktop' && (
-        <div className="absolute top-6 left-6 z-10 flex flex-col gap-5 pointer-events-none opacity-0 sm:opacity-90 transition-opacity">
-          {/* Note: Icons positioned underneath widget if widget is at top-left, or placed at top-left */}
-        </div>
-      )}
-
       {/* Draggable & Lockable Calendar Widget Window */}
       <div
         className={`absolute z-30 transition-transform ${
@@ -210,15 +170,13 @@ export default function App() {
         />
       </div>
 
-      {/* Windows 11 Bottom Taskbar */}
-      {settings.viewMode === 'desktop' && (
-        <div className="absolute bottom-0 left-0 right-0 z-40">
-          <WindowsTaskbar
-            onOpenCalendar={handleResetTopLeft}
-            onOpenSettings={() => setIsExportModalOpen(true)}
-          />
-        </div>
-      )}
+      {/* Windows Style System Tray in bottom-right */}
+      <SystemTray
+        settings={settings}
+        onUpdateSettings={handleUpdateSettings}
+        onResetTopLeft={handleResetTopLeft}
+        onOpenGuide={() => setIsExportModalOpen(true)}
+      />
 
       {/* Windows Deployment & Export Modal */}
       <WindowsExportModal

@@ -39,10 +39,6 @@ export interface WidgetSettings {
   position: { x: number; y: number };
   opacity: number; // 0.5 to 1.0
   blurEffect: boolean;
-  wallpaperId: string;
-  customWallpaperUrl?: string;
-  viewMode: 'desktop' | 'widget-only';
-  showTaskbar: boolean;
-  soundEffects: boolean;
-  autoSnapTopLeft: boolean;
+  autoStart: boolean; // 开机自启动
+  alwaysOnTop: boolean; // 窗口置顶
 }

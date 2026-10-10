@@ -262,12 +262,12 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
             {isLocked ? (
               <span className="flex items-center gap-1.5 text-slate-500">
                 <Lock className="w-3.5 h-3.5 text-slate-400" />
-                <span>已固定在桌面壁纸</span>
+                <span>已固定在桌面 (右下角托盘可解锁/设置)</span>
               </span>
             ) : (
               <span className="flex items-center gap-1.5 text-blue-700">
                 <Move className="w-3.5 h-3.5" />
-                <span className="font-semibold">按住此栏可自由拖动</span>
+                <span className="font-semibold">按住此栏可自由拖动位置</span>
               </span>
             )}
           </div>
