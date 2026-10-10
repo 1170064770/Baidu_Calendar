@@ -25,7 +25,7 @@ const DEFAULT_SETTINGS: WidgetSettings = {
   opacity: 0.98,
   blurEffect: true,
   autoStart: true, // 开机自启动
-  alwaysOnTop: false, // 窗口置顶
+  alwaysOnBottom: true, // 核心需求：窗口始终置底 (贴合桌面底层)
 };
 
 export default function App() {
@@ -34,7 +34,11 @@ export default function App() {
     try {
       const saved = localStorage.getItem('baidu_calendar_widget_settings');
       if (saved) {
-        return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        if (parsed.alwaysOnBottom === undefined) {
+          parsed.alwaysOnBottom = parsed.alwaysOnTop !== undefined ? !parsed.alwaysOnTop : true;
+        }
+        return { ...DEFAULT_SETTINGS, ...parsed };
       }
     } catch (e) {
       // fallback
@@ -136,15 +140,18 @@ export default function App() {
     }
   }, [settings.autoStart, handleUpdateSettings]);
 
-  // Toggle Always on Top
-  const handleToggleAlwaysOnTop = useCallback(() => {
-    const nextVal = !settings.alwaysOnTop;
-    handleUpdateSettings({ alwaysOnTop: nextVal });
+  // Toggle Always on Bottom (置底)
+  const handleToggleAlwaysOnBottom = useCallback(() => {
+    const nextVal = !settings.alwaysOnBottom;
+    handleUpdateSettings({ alwaysOnBottom: nextVal });
     const api = (window as any).electronAPI;
-    if (api?.setAlwaysOnTop) {
-      api.setAlwaysOnTop(nextVal);
+    if (api?.setAlwaysOnBottom) {
+      api.setAlwaysOnBottom(nextVal);
+    } else if (api?.setAlwaysOnTop) {
+      // In older preload, opposite of always-on-top
+      api.setAlwaysOnTop(false);
     }
-  }, [settings.alwaysOnTop, handleUpdateSettings]);
+  }, [settings.alwaysOnBottom, handleUpdateSettings]);
 
   // Listen to native Electron tray events if running in Electron
   useEffect(() => {
@@ -266,13 +273,18 @@ export default function App() {
   return (
     <div
       className="relative w-screen h-screen overflow-hidden select-none font-sans text-slate-800 bg-transparent"
-      onMouseDown={handleMouseDown}
+      onMouseDown={settings.isLocked ? undefined : handleMouseDown}
+      onContextMenu={(e) => {
+        // Allow right-click anywhere on the desktop to toggle tray menu for convenience
+        e.preventDefault();
+        setIsTrayMenuOpen((prev) => !prev);
+      }}
     >
       {/* Pure Calendar Widget Window (Zero Title Bar) */}
       <div
         className={`absolute z-30 transition-transform ${
           isCurrentlyDragging ? 'scale-[1.01] shadow-2xl duration-0' : 'duration-150'
-        }`}
+        } ${settings.isLocked ? 'pointer-events-none' : 'pointer-events-auto'}`}
         style={{
           left: `${settings.position.x}px`,
           top: `${settings.position.y}px`,
@@ -285,12 +297,11 @@ export default function App() {
         />
       </div>
 
-      {/* Floating System Tray Icon Trigger (Bottom-Right) */}
-      <div className="fixed bottom-4 right-4 z-40 select-none" ref={trayMenuRef}>
-        {/* Tray Popup Menu */}
-        {isTrayMenuOpen && (
+      {/* System Tray Menu (Opens via Right-Click or Native Tray) */}
+      {isTrayMenuOpen && (
+        <div className="fixed bottom-4 right-4 z-40 select-none" ref={trayMenuRef}>
           <div
-            className="absolute bottom-full right-0 mb-2 w-72 bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/90 p-4 text-slate-800 animate-in fade-in zoom-in-95 duration-150"
+            className="w-72 bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/90 p-4 text-slate-800 animate-in fade-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -323,7 +334,7 @@ export default function App() {
                     <span>改变位置</span>
                   </div>
                   <span className="text-[10px] text-slate-500 font-normal">
-                    {settings.isLocked ? '已锁定' : '可拖动'}
+                    {settings.isLocked ? '已锁定 (融入壁纸/无法点击)' : '已解锁 (可自由交互/拖拽)'}
                   </span>
                 </div>
 
@@ -379,12 +390,12 @@ export default function App() {
                     {settings.isLocked ? (
                       <>
                         <Unlock className="w-3.5 h-3.5" />
-                        <span>解锁自由拖拽 (按住卡片即可移动)</span>
+                        <span>解锁组件交互 (可点击日期/拖动)</span>
                       </>
                     ) : (
                       <>
                         <Lock className="w-3.5 h-3.5" />
-                        <span>锁定当前位置 (防误触)</span>
+                        <span>锁定并融入壁纸 (无法点击/防误触)</span>
                       </>
                     )}
                   </button>
@@ -449,21 +460,21 @@ export default function App() {
                 </label>
               </div>
 
-              {/* 窗口始终置顶 */}
+              {/* 窗口始终置底 */}
               <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
                 <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-amber-600" />
+                  <Layers className="w-4 h-4 text-indigo-600" />
                   <div>
-                    <div className="font-semibold text-slate-900">窗口始终置顶</div>
-                    <div className="text-[10px] text-slate-500">保持在其他应用窗口上方</div>
+                    <div className="font-semibold text-slate-900">窗口始终置底</div>
+                    <div className="text-[10px] text-slate-500">贴合桌面底层，不遮挡其他应用窗口</div>
                   </div>
                 </div>
 
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={settings.alwaysOnTop}
-                    onChange={handleToggleAlwaysOnTop}
+                    checked={settings.alwaysOnBottom}
+                    onChange={handleToggleAlwaysOnBottom}
                     className="sr-only peer"
                   />
                   <div className="w-8 h-4 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
@@ -483,26 +494,8 @@ export default function App() {
               </button>
             </div>
           </div>
-        )}
-
-        {/* Floating Tray Icon Button (Right-bottom corner) */}
-        <button
-          onClick={() => setIsTrayMenuOpen(!isTrayMenuOpen)}
-          className={`flex items-center gap-2 p-2 rounded-2xl transition-all shadow-lg border backdrop-blur-xl ${
-            isTrayMenuOpen
-              ? 'bg-blue-600 text-white border-blue-500 ring-2 ring-blue-300'
-              : 'bg-white/90 text-slate-700 border-white/60 hover:bg-white'
-          }`}
-          title="系统托盘：点击改变位置与设置"
-        >
-          <img
-            src="/tray-icon.png"
-            alt="日历托盘图标"
-            className="w-5 h-5 rounded-md shadow-2xs"
-          />
-          <span className="text-xs font-semibold pr-1">系统托盘</span>
-        </button>
-      </div>
+        </div>
+      )}
 
       {/* Windows Deployment & Export Modal */}
       <WindowsExportModal

@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   moveWindowBy: (dx, dy) => ipcRenderer.send('move-window-by', { dx, dy }),
   setWindowPosition: (x, y) => ipcRenderer.send('set-window-position', { x, y }),
   setOpacity: (val) => ipcRenderer.send('set-opacity', val),
+  setAlwaysOnBottom: (val) => ipcRenderer.send('set-always-on-bottom', val),
   setAlwaysOnTop: (val) => ipcRenderer.send('set-always-on-top', val),
   setAutoStart: (val) => ipcRenderer.send('set-auto-start', val),
   resetTopLeft: () => ipcRenderer.send('reset-top-left'),

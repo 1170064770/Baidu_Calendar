@@ -86,7 +86,7 @@ app.whenReady().then(createWindow);
                 Windows 桌面应用使用与部署指南
               </h3>
               <p className="text-xs text-slate-500">
-                支持浏览器内直接无感置顶、PWA 独立窗口或原生无边框桌面程序
+                支持浏览器内直接无感置底、PWA 独立窗口或原生无边框桌面程序
               </p>
             </div>
           </div>

@@ -40,5 +40,5 @@ export interface WidgetSettings {
   opacity: number; // 0.5 to 1.0
   blurEffect: boolean;
   autoStart: boolean; // 开机自启动
-  alwaysOnTop: boolean; // 窗口置顶
+  alwaysOnBottom: boolean; // 窗口始终置底 (贴合桌面底层)
 }

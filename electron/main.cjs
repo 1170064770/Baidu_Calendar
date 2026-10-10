@@ -5,7 +5,7 @@ const fs = require('fs');
 let mainWindow = null;
 let tray = null;
 let isLocked = true;
-let isAlwaysOnTop = false;
+let isAlwaysOnBottom = true;
 let isQuitting = false;
 
 // 配置文件路径，持久保存位置和设置
@@ -19,7 +19,7 @@ function loadConfig() {
   } catch (e) {
     // ignore
   }
-  return { x: 28, y: 28, opacity: 0.98, isLocked: true, isAlwaysOnTop: false };
+  return { x: 28, y: 28, opacity: 0.98, isLocked: true, isAlwaysOnBottom: true };
 }
 
 function saveConfig(cfg) {
@@ -35,7 +35,7 @@ function saveConfig(cfg) {
 function createWindow() {
   const config = loadConfig();
   isLocked = config.isLocked ?? true;
-  isAlwaysOnTop = config.isAlwaysOnTop ?? false;
+  isAlwaysOnBottom = config.isAlwaysOnBottom ?? (config.isAlwaysOnTop !== undefined ? !config.isAlwaysOnTop : true);
 
   mainWindow = new BrowserWindow({
     width: 485,
@@ -47,7 +47,7 @@ function createWindow() {
     resizable: false,
     skipTaskbar: true, // 核心需求：不出现在 Windows 任务栏，只保留系统托盘图标
     hasShadow: true,
-    alwaysOnTop: isAlwaysOnTop,
+    alwaysOnTop: false, // 桌面壁纸底层挂件，不遮挡其他软件
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -64,6 +64,7 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+    applyLockState(isLocked);
   });
 
   // 窗口位置变动时持久化保存
@@ -86,6 +87,24 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+}
+
+function applyLockState(locked) {
+  isLocked = Boolean(locked);
+  saveConfig({ isLocked });
+  if (mainWindow) {
+    try {
+      if (isLocked) {
+        mainWindow.setIgnoreMouseEvents(true, { forward: true });
+      } else {
+        mainWindow.setIgnoreMouseEvents(false);
+      }
+    } catch (e) {
+      mainWindow.setIgnoreMouseEvents(isLocked);
+    }
+    mainWindow.webContents.send('toggle-lock', isLocked);
+  }
+  updateTrayMenu();
 }
 
 function setPositionPreset(preset) {
@@ -167,27 +186,15 @@ function updateTrayMenu() {
         },
         { type: 'separator' },
         {
-          label: '🔓 开启自由拖拽位置',
-          type: 'checkbox',
-          checked: !isLocked,
-          click: (item) => {
-            isLocked = !item.checked;
-            saveConfig({ isLocked });
-            if (mainWindow) {
-              mainWindow.webContents.send('toggle-lock', isLocked);
-            }
-            updateTrayMenu();
+          label: isLocked ? '🔓 解锁组件交互 (点击开启交互与拖拽)' : '🔓 自由交互与拖拽 (当前已开启)',
+          click: () => {
+            applyLockState(false);
           },
         },
         {
-          label: '🔒 锁定当前位置 (防误触)',
+          label: isLocked ? '🔒 锁定融入壁纸 (当前已锁定/无法点击)' : '🔒 锁定融入壁纸 (禁止点击/防误触)',
           click: () => {
-            isLocked = true;
-            saveConfig({ isLocked });
-            if (mainWindow) {
-              mainWindow.webContents.send('toggle-lock', true);
-            }
-            updateTrayMenu();
+            applyLockState(true);
           },
         },
       ],
@@ -225,14 +232,14 @@ function updateTrayMenu() {
       },
     },
     {
-      label: '窗口始终置顶',
+      label: '窗口始终置底',
       type: 'checkbox',
-      checked: isAlwaysOnTop,
+      checked: isAlwaysOnBottom,
       click: (item) => {
-        isAlwaysOnTop = item.checked;
-        saveConfig({ isAlwaysOnTop });
+        isAlwaysOnBottom = item.checked;
+        saveConfig({ isAlwaysOnBottom });
         if (mainWindow) {
-          mainWindow.setAlwaysOnTop(isAlwaysOnTop);
+          mainWindow.setAlwaysOnTop(false);
         }
       },
     },
@@ -310,12 +317,21 @@ ipcMain.on('set-opacity', (_event, val) => {
   setOpacity(val);
 });
 
-ipcMain.on('set-always-on-top', (_event, val) => {
-  isAlwaysOnTop = Boolean(val);
+ipcMain.on('set-always-on-bottom', (_event, val) => {
+  isAlwaysOnBottom = Boolean(val);
   if (mainWindow) {
-    mainWindow.setAlwaysOnTop(isAlwaysOnTop);
+    mainWindow.setAlwaysOnTop(false);
   }
-  saveConfig({ isAlwaysOnTop });
+  saveConfig({ isAlwaysOnBottom });
+  updateTrayMenu();
+});
+
+ipcMain.on('set-always-on-top', (_event, val) => {
+  isAlwaysOnBottom = !Boolean(val);
+  if (mainWindow) {
+    mainWindow.setAlwaysOnTop(false);
+  }
+  saveConfig({ isAlwaysOnBottom });
   updateTrayMenu();
 });
 
@@ -335,9 +351,7 @@ ipcMain.on('reset-top-left', () => {
 });
 
 ipcMain.on('set-lock-state', (_event, locked) => {
-  isLocked = Boolean(locked);
-  saveConfig({ isLocked });
-  updateTrayMenu();
+  applyLockState(locked);
 });
 
 // 退出应用

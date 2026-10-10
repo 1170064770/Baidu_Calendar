@@ -186,16 +186,14 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
 
   // Jump to today
   const handleGoToday = () => {
-    // We can jump to live today (or 2026-10-10 demo anchor if user wants)
     const now = new Date();
-    // Defaulting to current live date or screenshot 2026-10-10
-    const targetY = now.getFullYear();
-    const targetM = now.getMonth() + 1;
-    const targetD = now.getDate();
+    const y = now.getFullYear();
+    const m = now.getMonth() + 1;
+    const d = now.getDate();
 
-    setCurrentYear(targetY);
-    setCurrentMonth(targetM);
-    setSelectedDate({ year: targetY, month: targetM, day: targetD });
+    setCurrentYear(y);
+    setCurrentMonth(m);
+    setSelectedDate({ year: y, month: m, day: d });
     setSelectedHolidayLabel('假期');
   };
 
@@ -224,12 +222,12 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
   return (
     <>
       <div
-        className={`relative w-[460px] max-w-[95vw] rounded-[24px] transition-all select-none duration-150 ${
+        className={`relative w-[460px] max-w-[95vw] rounded-[24px] transition-all select-none duration-200 ${
           blurEffect ? 'backdrop-blur-xl' : ''
         } ${
           isLocked
-            ? 'shadow-[0_12px_40px_rgba(0,0,0,0.12)] border border-slate-200/80'
-            : 'shadow-[0_20px_50px_rgba(0,0,0,0.22)] ring-2 ring-blue-500/50 border border-blue-400/60 cursor-move'
+            ? 'pointer-events-none shadow-[0_8px_32px_rgba(0,0,0,0.06)] border border-white/50 cursor-default'
+            : 'pointer-events-auto shadow-[0_20px_50px_rgba(0,0,0,0.22)] ring-2 ring-blue-500/60 border border-blue-400/80 cursor-move'
         }`}
         style={{
           backgroundColor: `rgba(255, 255, 255, ${opacity})`,
