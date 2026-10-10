@@ -4,17 +4,6 @@ import {
   ChevronRight,
   ChevronDown,
   Clock,
-  Pin,
-  Lock,
-  Unlock,
-  Move,
-  Settings,
-  Sliders,
-  Eye,
-  Power,
-  Layers,
-  X,
-  HelpCircle,
 } from 'lucide-react';
 import { AlmanacDay, StatutoryHoliday } from '../types/calendar';
 import {
@@ -26,30 +15,14 @@ import { AlmanacDetailModal } from './AlmanacDetailModal';
 
 interface CalendarWidgetProps {
   isLocked: boolean;
-  onToggleLock: () => void;
-  onResetTopLeft: () => void;
   opacity: number;
-  onChangeOpacity?: (val: number) => void;
-  autoStart?: boolean;
-  onToggleAutoStart?: () => void;
-  alwaysOnTop?: boolean;
-  onToggleAlwaysOnTop?: () => void;
   blurEffect: boolean;
-  onOpenExportGuide?: () => void;
 }
 
 export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
   isLocked,
-  onToggleLock,
-  onResetTopLeft,
   opacity,
-  onChangeOpacity,
-  autoStart = true,
-  onToggleAutoStart,
-  alwaysOnTop = false,
-  onToggleAlwaysOnTop,
   blurEffect,
-  onOpenExportGuide,
 }) => {
   // Current view year & month (default 2026年 10月 as in the user's screenshot)
   const [currentYear, setCurrentYear] = useState<number>(2026);
@@ -75,7 +48,6 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
   const [isHolidayDropdownOpen, setIsHolidayDropdownOpen] = useState(false);
   const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
   const [isMonthDropdownOpen, setIsMonthDropdownOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedHolidayLabel, setSelectedHolidayLabel] = useState<string>('假期');
 
   // Huangli Detail Modal
@@ -91,7 +63,6 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
   const holidayRef = useRef<HTMLDivElement>(null);
   const yearRef = useRef<HTMLDivElement>(null);
   const monthRef = useRef<HTMLDivElement>(null);
-  const settingsRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -104,9 +75,6 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
       }
       if (monthRef.current && !monthRef.current.contains(e.target as Node)) {
         setIsMonthDropdownOpen(false);
-      }
-      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
-        setIsSettingsOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -261,212 +229,20 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
         } ${
           isLocked
             ? 'shadow-[0_12px_40px_rgba(0,0,0,0.12)] border border-slate-200/80'
-            : 'shadow-[0_20px_50px_rgba(0,0,0,0.22)] ring-2 ring-blue-500/50 border border-blue-400/60'
+            : 'shadow-[0_20px_50px_rgba(0,0,0,0.22)] ring-2 ring-blue-500/50 border border-blue-400/60 cursor-move'
         }`}
         style={{
           backgroundColor: `rgba(255, 255, 255, ${opacity})`,
-        }}
+          WebkitAppRegion: isLocked ? 'no-drag' : 'drag',
+        } as any}
       >
-        {/* Windows Widget Title Bar / Drag Grip */}
-        <div
-          className={`relative flex items-center justify-between px-4 py-2 border-b transition-colors rounded-t-[24px] ${
-            isLocked
-              ? 'bg-slate-50/60 border-slate-100 text-slate-500 cursor-default'
-              : 'bg-blue-50/90 border-blue-200 text-blue-900 cursor-move'
-          }`}
-          data-drag-handle="true"
-          style={{
-            WebkitAppRegion: isLocked ? 'no-drag' : 'drag',
-          } as any}
-        >
-          <div className="flex items-center gap-2 text-xs font-medium pointer-events-none">
-            {isLocked ? (
-              <span className="flex items-center gap-1.5 text-slate-500">
-                <Lock className="w-3.5 h-3.5 text-slate-400" />
-                <span>已固定桌面 (点击解锁可拖动)</span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-blue-700">
-                <Move className="w-3.5 h-3.5" />
-                <span className="font-semibold">按住此栏可自由拖动位置</span>
-              </span>
-            )}
-          </div>
-
-          <div
-            className="flex items-center gap-1.5"
-            style={{ WebkitAppRegion: 'no-drag' } as any}
-          >
-            <button
-              onClick={onResetTopLeft}
-              title="一键吸附至桌面左上角 (28, 28)"
-              className="p-1 text-slate-500 hover:text-blue-600 hover:bg-white/80 rounded-md transition-colors text-xs flex items-center gap-1"
-            >
-              <Pin className="w-3 h-3" />
-              <span className="text-[11px] hidden sm:inline">左上角</span>
-            </button>
-
-            <button
-              onClick={onToggleLock}
-              title={isLocked ? '点击解锁拖动' : '点击锁定固定'}
-              className={`px-2 py-0.5 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
-                isLocked
-                  ? 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 shadow-2xs'
-                  : 'bg-blue-600 text-white hover:bg-blue-700 shadow-2xs'
-              }`}
-            >
-              {isLocked ? (
-                <>
-                  <Unlock className="w-3 h-3" />
-                  <span>解锁拖动</span>
-                </>
-              ) : (
-                <>
-                  <Lock className="w-3 h-3" />
-                  <span>锁定固定</span>
-                </>
-              )}
-            </button>
-
-            {/* Settings Gear Button */}
-            <div className="relative" ref={settingsRef}>
-              <button
-                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                title="小组件设置 (透明度、自启、置顶)"
-                className={`p-1 rounded-md text-xs transition-colors flex items-center justify-center ${
-                  isSettingsOpen
-                    ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-300'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/80'
-                }`}
-              >
-                <Settings className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Settings Dropdown Popover */}
-              {isSettingsOpen && (
-                <div
-                  className="absolute right-0 top-full mt-2 w-72 bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/90 p-4 text-slate-800 z-50 animate-in fade-in zoom-in-95 duration-150"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
-                    <div className="text-xs font-bold text-slate-900">小组件属性设置</div>
-                    <button
-                      onClick={() => setIsSettingsOpen(false)}
-                      className="p-1 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-3 text-xs">
-                    {/* Opacity Control */}
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
-                      <div className="flex items-center justify-between text-slate-700 font-semibold">
-                        <div className="flex items-center gap-1.5">
-                          <Eye className="w-3.5 h-3.5 text-slate-500" />
-                          <span>背景透明度</span>
-                        </div>
-                        <span className="text-blue-600 font-bold">{Math.round(opacity * 100)}%</span>
-                      </div>
-
-                      <input
-                        type="range"
-                        min="0.5"
-                        max="1.0"
-                        step="0.05"
-                        value={opacity}
-                        onChange={(e) => onChangeOpacity?.(parseFloat(e.target.value))}
-                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                      />
-
-                      <div className="grid grid-cols-4 gap-1 text-[10px]">
-                        {[1.0, 0.9, 0.8, 0.7].map((val) => (
-                          <button
-                            key={val}
-                            onClick={() => onChangeOpacity?.(val)}
-                            className={`py-1 rounded-md font-medium transition-colors ${
-                              Math.abs(opacity - val) < 0.03
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
-                            }`}
-                          >
-                            {Math.round(val * 100)}%
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Auto-Start on Boot */}
-                    <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <Power className="w-4 h-4 text-emerald-600" />
-                        <div>
-                          <div className="font-semibold text-slate-900">开机自启动</div>
-                          <div className="text-[10px] text-slate-500">登录 Windows 自动在桌面启动</div>
-                        </div>
-                      </div>
-
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={autoStart}
-                          onChange={() => onToggleAutoStart?.()}
-                          className="sr-only peer"
-                        />
-                        <div className="w-8 h-4 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-
-                    {/* Always on top */}
-                    <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <Layers className="w-4 h-4 text-amber-600" />
-                        <div>
-                          <div className="font-semibold text-slate-900">窗口始终置顶</div>
-                          <div className="text-[10px] text-slate-500">常驻在其他软件窗口之上</div>
-                        </div>
-                      </div>
-
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={alwaysOnTop}
-                          onChange={() => onToggleAlwaysOnTop?.()}
-                          className="sr-only peer"
-                        />
-                        <div className="w-8 h-4 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-
-                    {/* Tray Info note */}
-                    <div className="p-2 bg-blue-50/70 border border-blue-100 rounded-xl text-[11px] text-blue-900">
-                      💡 <strong>系统托盘说明</strong>：小组件已在 Windows 任务栏系统托盘常驻，右键任务栏托盘图标亦可进行锁定、自启与退出。
-                    </div>
-
-                    {/* Guide link */}
-                    {onOpenExportGuide && (
-                      <button
-                        onClick={() => {
-                          setIsSettingsOpen(false);
-                          onOpenExportGuide();
-                        }}
-                        className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-xl font-medium text-slate-700 transition-colors"
-                      >
-                        <HelpCircle className="w-3.5 h-3.5" />
-                        <span>Windows 使用与打包指引</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* Main Calendar Body */}
         <div className="p-5">
           {/* Top Controls: 假期下拉、年份、月份切换、今天按钮 */}
-          <div className="flex items-center justify-between gap-2 mb-4">
+          <div
+            className="flex items-center justify-between gap-2 mb-4"
+            style={{ WebkitAppRegion: 'no-drag' } as any}
+          >
             {/* 假期 Dropdown */}
             <div className="relative" ref={holidayRef}>
               <button

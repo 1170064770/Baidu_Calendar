@@ -88,6 +88,38 @@ function createWindow() {
   });
 }
 
+function setPositionPreset(preset) {
+  if (!mainWindow) return;
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+  const winWidth = 485;
+  const winHeight = 675;
+  let x = 28;
+  let y = 28;
+
+  if (preset === 'top-left') {
+    x = 28;
+    y = 28;
+  } else if (preset === 'top-right') {
+    x = Math.max(28, width - winWidth - 28);
+    y = 28;
+  } else if (preset === 'center') {
+    x = Math.max(28, Math.round((width - winWidth) / 2));
+    y = Math.max(28, Math.round((height - winHeight) / 2));
+  } else if (preset === 'bottom-left') {
+    x = 28;
+    y = Math.max(28, height - winHeight - 28);
+  } else if (preset === 'bottom-right') {
+    x = Math.max(28, width - winWidth - 28);
+    y = Math.max(28, height - winHeight - 28);
+  }
+
+  mainWindow.setPosition(x, y);
+  saveConfig({ x, y });
+  mainWindow.webContents.send('set-position', { x, y });
+  mainWindow.show();
+}
+
 function updateTrayMenu() {
   if (!tray) return;
 
@@ -111,27 +143,54 @@ function updateTrayMenu() {
       },
     },
     {
-      label: '锁定挂件 (锁定固定 / 解锁拖动)',
-      type: 'checkbox',
-      checked: isLocked,
-      click: (item) => {
-        isLocked = item.checked;
-        saveConfig({ isLocked });
-        if (mainWindow) {
-          mainWindow.webContents.send('toggle-lock', isLocked);
-        }
-      },
-    },
-    {
-      label: '固定到桌面左上角 (28, 28)',
-      click: () => {
-        if (mainWindow) {
-          mainWindow.setPosition(28, 28);
-          saveConfig({ x: 28, y: 28 });
-          mainWindow.webContents.send('reset-position');
-          mainWindow.show();
-        }
-      },
+      label: '改变位置',
+      submenu: [
+        {
+          label: '📌 固定到左上角 (28, 28) (默认)',
+          click: () => setPositionPreset('top-left'),
+        },
+        {
+          label: '📌 固定到右上角',
+          click: () => setPositionPreset('top-right'),
+        },
+        {
+          label: '📌 固定到居中',
+          click: () => setPositionPreset('center'),
+        },
+        {
+          label: '📌 固定到左下角',
+          click: () => setPositionPreset('bottom-left'),
+        },
+        {
+          label: '📌 固定到右下角',
+          click: () => setPositionPreset('bottom-right'),
+        },
+        { type: 'separator' },
+        {
+          label: '🔓 开启自由拖拽位置',
+          type: 'checkbox',
+          checked: !isLocked,
+          click: (item) => {
+            isLocked = !item.checked;
+            saveConfig({ isLocked });
+            if (mainWindow) {
+              mainWindow.webContents.send('toggle-lock', isLocked);
+            }
+            updateTrayMenu();
+          },
+        },
+        {
+          label: '🔒 锁定当前位置 (防误触)',
+          click: () => {
+            isLocked = true;
+            saveConfig({ isLocked });
+            if (mainWindow) {
+              mainWindow.webContents.send('toggle-lock', true);
+            }
+            updateTrayMenu();
+          },
+        },
+      ],
     },
     {
       label: '背景透明度',
