@@ -1,0 +1,6 @@
+{
+  "name": "百度日历桌面小组件",
+  "description": "高度还原百度开放数据平台日历的 Windows 桌面小组件应用，支持无感固定至桌面左上角、锁定固定与解锁拖动、节假日调休与老黄历宜忌。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
