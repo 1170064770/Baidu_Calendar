@@ -1,0 +1,34 @@
+{
+  "appId": "com.baidu.calendar.desktop",
+  "productName": "百度日历桌面小组件",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*"
+  ],
+  "main": "electron/main.cjs",
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "百度日历桌面小组件"
+  },
+  "portable": {
+    "artifactName": "BaiduCalendarDesktop-Portable-${version}.exe"
+  }
+}

@@ -1,0 +1,81 @@
+name: Build and Release Windows EXE
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm install --include=dev
+          npm install -D electron electron-builder
+
+      - name: Build Web Application
+        run: npm run build
+
+      - name: Build Windows EXE with electron-builder
+        run: |
+          npx electron-builder --win nsis portable --config electron-builder.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Artifacts (Actions Download)
+        uses: actions/upload-artifact@v4
+        with:
+          name: BaiduCalendar-Windows-EXE
+          path: |
+            release/*.exe
+          retention-days: 30
+
+      - name: Generate Release Tag
+        id: tag
+        shell: bash
+        run: |
+          TAG_NAME="v1.0.${{ github.run_number }}"
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          name: "百度日历桌面版 Windows EXE (${{ steps.tag.outputs.tag_name }})"
+          body: |
+            ## 百度日历 Windows 桌面小组件发布
+
+            - **触发分支**: `main`
+            - **提交哈希**: `${{ steps.tag.outputs.short_sha }}`
+            - **构建时间**: ${{ github.event.head_commit.timestamp || 'Latest' }}
+
+            ### 包含产物
+            - **安装版 (NSIS)**: 支持安装向导、创建桌面与开始菜单快捷方式
+            - **免安装便携版 (Portable)**: 单文件 `.exe`，双击直接运行，可随时无感贴附于桌面左上角壁纸
+
+            ### 变更信息
+            ${{ github.event.head_commit.message || 'Main 分支更新自动构建' }}
+          files: |
+            release/*.exe
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

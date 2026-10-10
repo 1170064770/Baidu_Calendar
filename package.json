@@ -2,13 +2,14 @@
   "name": "react-example",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
+    "build:exe": "vite build && electron-builder --win",
     "start": "tsx server.ts",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
+    "clean": "rm -rf dist server.js release",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

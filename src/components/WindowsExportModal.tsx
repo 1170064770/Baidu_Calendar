@@ -154,36 +154,28 @@ app.whenReady().then(createWindow);
             </pre>
           </div>
 
-          {/* Method 3: Electron Native */}
-          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70">
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2 font-bold text-slate-900">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>方式三：Electron 打包为 Windows .exe</span>
-              </div>
-              <button
-                onClick={() => handleCopy(electronScript, 'electron')}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-100 transition-colors shadow-2xs"
-              >
-                {copiedType === 'electron' ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>已复制</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>复制配置</span>
-                  </>
-                )}
-              </button>
+          {/* Method 3: GitHub Actions Automated EXE Release */}
+          <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50">
+            <div className="flex items-center gap-2 font-bold text-emerald-950 mb-1">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>方式三：GitHub Actions 自动打包发布 (已配置完成)</span>
             </div>
-            <p className="text-xs text-slate-600 mb-2">
-              可配合 <code>electron-packager</code> 或 <code>electron-builder</code> 打包为可分发的 Windows 安装包或绿色版 exe。
+            <p className="text-xs text-emerald-900/90 mb-2 leading-relaxed">
+              已创建 <code>.github/workflows/build-exe.yml</code>。当您向 <code>main</code> 分支提交代码时，GitHub 会自动启动 Windows 构建机，并打包生成：
             </p>
-            <pre className="p-3 bg-slate-900 text-slate-100 rounded-lg text-[11px] overflow-x-auto font-mono leading-relaxed">
-              {electronScript}
-            </pre>
+            <div className="space-y-1 text-xs text-slate-700 bg-white p-3 rounded-lg border border-emerald-100">
+              <div className="flex items-center gap-1.5 font-medium text-slate-900">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span>BaiduCalendarDesktop-Setup-*.exe (NSIS 标准安装包)</span>
+              </div>
+              <div className="flex items-center gap-1.5 font-medium text-slate-900">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span>BaiduCalendarDesktop-Portable-*.exe (免安装绿色便携单文件)</span>
+              </div>
+              <div className="text-[11px] text-slate-500 pt-1">
+                可在 GitHub 仓库的 <strong>Actions</strong> 标签页或 <strong>Releases</strong> 页面直接一键下载。
+              </div>
+            </div>
           </div>
         </div>
 
