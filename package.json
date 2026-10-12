@@ -3,6 +3,7 @@
   "productName": "百度日历桌面小组件",
   "description": "高度还原百度开放数据平台日历的 Windows 桌面小组件应用",
   "author": "Baidu Calendar Team",
+  "license": "CC0-1.0",
   "version": "1.0.0",
   "type": "module",
   "main": "electron/main.cjs",
