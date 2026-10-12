@@ -769,16 +769,18 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
             </div>
           )}
         </div>
-      </div>
 
-      {/* Huangli Details Modal */}
-      <AlmanacDetailModal
-        isOpen={isHuangliModalOpen}
-        onClose={() => setIsHuangliModalOpen(false)}
-        year={selectedDate.year}
-        month={selectedDate.month}
-        day={selectedDate.day}
-      />
+        {/* Huangli Details Modal (直接贴合在卡片内，完全消除外层半透明遮罩与方形边框) */}
+        {isHuangliModalOpen && (
+          <AlmanacDetailModal
+            isOpen={isHuangliModalOpen}
+            onClose={() => setIsHuangliModalOpen(false)}
+            year={selectedDate.year}
+            month={selectedDate.month}
+            day={selectedDate.day}
+          />
+        )}
+      </div>
     </>
   );
 };

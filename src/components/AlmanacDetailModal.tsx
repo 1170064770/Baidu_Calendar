@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, Calendar, Compass, ShieldAlert, Sparkles, Clock } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { X, Calendar, Compass, ShieldAlert, Sparkles, Clock, ArrowLeft } from 'lucide-react';
 import { getDetailedHuangli } from '../utils/calendarUtils';
 
 interface AlmanacDetailModalProps {
@@ -17,39 +17,46 @@ export const AlmanacDetailModal: React.FC<AlmanacDetailModalProps> = ({
   month,
   day,
 }) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   if (!isOpen) return null;
 
   const huangli = getDetailedHuangli(year, month, day);
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 transition-opacity"
-      onClick={onClose}
+      data-no-drag="true"
+      style={{ WebkitAppRegion: 'no-drag' } as any}
+      className="absolute inset-0 z-50 rounded-[24px] bg-white text-slate-800 shadow-xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
+      onClick={(e) => e.stopPropagation()}
     >
-      <div
-        data-no-drag="true"
-        style={{ WebkitAppRegion: 'no-drag' } as any}
-        className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 text-slate-800 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 bg-red-50 text-red-600 rounded-lg">
-              <Calendar className="w-5 h-5" />
-            </span>
-            <div>
-              <h3 className="text-base font-bold text-slate-900">老黄历详解</h3>
-              <p className="text-xs text-slate-500">{huangli.solarDate}</p>
-            </div>
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/90 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <span className="p-1.5 bg-red-50 text-red-600 rounded-lg shadow-2xs">
+            <Calendar className="w-4 h-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">老黄历详解</h3>
+            <p className="text-[11px] text-slate-500">{huangli.solarDate}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-full transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
+        <button
+          onClick={onClose}
+          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-full transition-colors cursor-pointer"
+          title="关闭 (Esc)"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
 
         {/* Content */}
         <div className="p-6 overflow-y-auto space-y-5 text-sm">
@@ -176,15 +183,16 @@ export const AlmanacDetailModal: React.FC<AlmanacDetailModalProps> = ({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors shadow-2xs"
-          >
-            关闭
-          </button>
-        </div>
+      {/* Footer */}
+      <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between shrink-0">
+        <span className="text-[11px] text-slate-400">支持上下滚动查阅吉凶时辰</span>
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors shadow-2xs cursor-pointer"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>返回日历</span>
+        </button>
       </div>
     </div>
   );
