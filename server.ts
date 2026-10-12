@@ -128,6 +128,10 @@ app.get('/api/calendar', async (req: Request, res: Response) => {
           query,
           almanac,
         };
+        if (calendarCache.size > 20) {
+          const oldestKey = calendarCache.keys().next().value;
+          if (oldestKey) calendarCache.delete(oldestKey);
+        }
         calendarCache.set(query, { timestamp: Date.now(), data: payload });
         res.json(payload);
         return;

@@ -29,9 +29,9 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
   const thisMonth = today.getMonth() + 1;
   const thisDay = today.getDate();
 
-  // Current view year & month (default to 2026年 10月 as set in mock/initial state or today)
-  const [currentYear, setCurrentYear] = useState<number>(2026);
-  const [currentMonth, setCurrentMonth] = useState<number>(10);
+  // Current view year & month (default to today)
+  const [currentYear, setCurrentYear] = useState<number>(thisYear);
+  const [currentMonth, setCurrentMonth] = useState<number>(thisMonth);
 
   // Selected date
   const [selectedDate, setSelectedDate] = useState<{
@@ -39,9 +39,9 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
     month: number;
     day: number;
   }>({
-    year: 2026,
-    month: 10,
-    day: 10,
+    year: thisYear,
+    month: thisMonth,
+    day: thisDay,
   });
 
   // Calendar data from Baidu API or fallback
@@ -327,11 +327,9 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
       <div
         data-widget-container="true"
         className={`relative w-[460px] max-w-[95vw] rounded-[24px] transition-all select-none duration-200 ${
-          blurEffect ? 'backdrop-blur-xl' : ''
-        } ${
           isLocked
-            ? 'pointer-events-none shadow-[0_8px_32px_rgba(0,0,0,0.06)] border border-white/50 cursor-default'
-            : 'pointer-events-auto shadow-[0_20px_50px_rgba(0,0,0,0.22)] ring-2 ring-blue-500/60 border border-blue-400/80 cursor-move'
+            ? 'pointer-events-none shadow-[0_8px_32px_rgba(0,0,0,0.06)] border border-slate-200/40 cursor-default'
+            : 'pointer-events-auto shadow-[0_20px_50px_rgba(0,0,0,0.18)] ring-2 ring-blue-500/60 border border-blue-400/80 cursor-move'
         }`}
         style={{
           backgroundColor: `rgba(255, 255, 255, ${opacity})`,

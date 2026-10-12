@@ -10,6 +10,7 @@
     "public/**/*"
   ],
   "win": {
+    "icon": "public/icon.ico",
     "target": [
       {
         "target": "nsis",
@@ -27,7 +28,10 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "百度日历桌面小组件"
+    "shortcutName": "百度日历桌面小组件",
+    "installerIcon": "public/icon.ico",
+    "uninstallerIcon": "public/icon.ico",
+    "installerHeaderIcon": "public/icon.ico"
   },
   "portable": {
     "artifactName": "BaiduCalendarDesktop-Portable-v${version}.${ext}"

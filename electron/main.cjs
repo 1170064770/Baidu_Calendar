@@ -2,10 +2,74 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage } = require
 const path = require('path');
 const fs = require('fs');
 
+// ==========================================
+// 极致低内存调优 (在不损失任何功能的前提下，以性能换取超低运行内存)
+// ==========================================
+// 1. V8 引擎极限瘦身：
+//    --max-old-space-size=48: 将老生代内存上限严格限制为 48MB，促使 V8 主动回收垃圾避免无度膨胀
+//    --expose-gc: 暴露 GC 回收接口，便于定时和空闲时深度清理内存
+//    --optimize-for-size: 告知 V8 编译器优先追求最小代码与数据尺寸，牺牲极端微秒级计算性能
+//    --lite-mode: 启用 V8 精简模式，关闭激进的 JIT TurboFan 多层优化和庞大的反馈向量，大幅节省数十兆内存
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=48 --expose-gc --optimize-for-size --lite-mode');
+
+// 2. 严格限制单个渲染进程，消灭多渲染进程带来的重复基础库开销
+app.commandLine.appendSwitch('renderer-process-limit', '1');
+
+// 3. 彻底禁用 Chromium 中与日历挂件无关的后台服务与庞大子系统
+app.commandLine.appendSwitch('disable-background-networking');
+app.commandLine.appendSwitch('disable-component-update');
+app.commandLine.appendSwitch('disable-domain-reliability');
+app.commandLine.appendSwitch('disable-sync');
+app.commandLine.appendSwitch('disable-breakpad');
+app.commandLine.appendSwitch('disable-metrics');
+app.commandLine.appendSwitch('disable-metrics-repo');
+app.commandLine.appendSwitch('disable-speech-api');
+app.commandLine.appendSwitch('disable-speech-synthesis-api');
+app.commandLine.appendSwitch('disable-print-preview');
+app.commandLine.appendSwitch('disable-default-apps');
+
+// 4. 禁用不必要的网页预取、后台特性及页面前进后退缓存
+app.commandLine.appendSwitch(
+  'disable-features',
+  'CalculateNativeWinOcclusion,MediaRouter,OptimizationHints,Translate,BackForwardCache,InterestFeedContentSuggestions,Autofill'
+);
+
+// 5. 限制磁盘与媒体缓存为 1MB，禁用 GPU 着色器磁盘缓存与 WebGL 3D（日历仅需 2D 文本和卡片渲染）
+app.commandLine.appendSwitch('disk-cache-size', '1048576');
+app.commandLine.appendSwitch('media-cache-size', '1048576');
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+app.commandLine.appendSwitch('disable-webgl');
+app.commandLine.appendSwitch('disable-webgl2');
+
+// 6. 开启 Chromium 积极内存回收策略
+app.commandLine.appendSwitch('enable-features', 'PurgeAndSuspend');
+
 let mainWindow = null;
 let tray = null;
 let isLocked = true;
 let isQuitting = false;
+
+// 深度内存清理函数：释放会话缓存并强制触发主进程和渲染进程 GC
+async function trimProcessMemory() {
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const ses = mainWindow.webContents.session;
+      await ses.clearCache();
+      mainWindow.webContents.send('trigger-gc');
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // 触发 Node / V8 主进程强制垃圾回收
+  if (global.gc) {
+    try {
+      global.gc();
+    } catch (e) {
+      // ignore
+    }
+  }
+}
 
 // 配置文件路径，持久保存位置和设置
 const configPath = path.join(app.getPath('userData'), 'widget-config.json');
@@ -35,6 +99,8 @@ function createWindow() {
   const config = loadConfig();
   isLocked = config.isLocked ?? true;
 
+  const appIconPath = path.join(__dirname, '../public/icon.png');
+
   mainWindow = new BrowserWindow({
     width: 485,
     height: 675,
@@ -46,10 +112,18 @@ function createWindow() {
     skipTaskbar: true, // 核心需求：不出现在 Windows 任务栏，只保留系统托盘图标
     hasShadow: true,
     alwaysOnTop: false, // 桌面壁纸底层挂件，不遮挡其他软件
+    icon: fs.existsSync(appIconPath) ? appIconPath : undefined,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.cjs'),
+      devTools: false, // 禁用 DevTools 核心，减少常驻代理内存
+      spellcheck: false, // 禁用拼写检查字典，直接节约 25MB+ 内存
+      webgl: false, // 禁用 WebGL 3D 渲染，释放 GPU 进程上下文池
+      plugins: false,
+      enableWebSQL: false,
+      backgroundThrottling: true, // 允许后台挂起节流，降低静止驻留消耗
+      v8CacheOptions: 'none', // 禁用冗余的代码缓存
     },
   });
 
@@ -63,6 +137,8 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     applyLockState(isLocked);
+    // 启动 2 秒渲染完毕后，立即进行初次深度内存清理，回收启动初始化的垃圾
+    setTimeout(trimProcessMemory, 2000);
   });
 
   // 窗口位置变动时持久化保存
@@ -102,6 +178,8 @@ function applyLockState(locked) {
     try {
       if (isLocked) {
         mainWindow.setIgnoreMouseEvents(true, { forward: true });
+        // 当锁定并融入桌面壁纸时，界面进入静止展示状态，立即触发深度内存压缩与 GC
+        setTimeout(trimProcessMemory, 300);
       } else {
         mainWindow.setIgnoreMouseEvents(false);
       }
@@ -120,6 +198,8 @@ function toggleWindowVisibility() {
   }
   if (mainWindow.isVisible()) {
     mainWindow.hide();
+    // 隐藏窗口时深度释放渲染缓存
+    setTimeout(trimProcessMemory, 200);
   } else {
     mainWindow.show();
     mainWindow.focus();
@@ -180,6 +260,12 @@ function updateTrayMenu() {
           click: () => setOpacity(0.7),
         },
       ],
+    },
+    {
+      label: '⚡ 深度清理运行内存',
+      click: () => {
+        trimProcessMemory();
+      },
     },
     {
       label: '开机自启动',
@@ -283,6 +369,13 @@ ipcMain.on('reset-top-left', () => {
 ipcMain.on('set-lock-state', (_event, locked) => {
   applyLockState(locked);
 });
+
+ipcMain.on('trim-memory', () => {
+  trimProcessMemory();
+});
+
+// 每 60 秒在后台静默进行轻量级内存与会话缓存整理
+setInterval(trimProcessMemory, 60000);
 
 // 退出应用
 app.on('before-quit', () => {

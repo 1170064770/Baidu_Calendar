@@ -23,7 +23,7 @@ export const AlmanacDetailModal: React.FC<AlmanacDetailModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-xs transition-opacity"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 transition-opacity"
       onClick={onClose}
     >
       <div

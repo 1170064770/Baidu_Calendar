@@ -86,6 +86,9 @@ export default function App() {
     if (api?.setLockState) {
       api.setLockState(nextLocked);
     }
+    if (nextLocked && api?.trimMemory) {
+      setTimeout(() => api.trimMemory(), 300);
+    }
   }, [settings.isLocked, handleUpdateSettings]);
 
   // Change Opacity
@@ -130,6 +133,15 @@ export default function App() {
       });
       api.onResetPosition?.(() => {
         handleUpdateSettings({ position: { x: 28, y: 28 } });
+      });
+      api.onTriggerGc?.(() => {
+        if (typeof (window as any).gc === 'function') {
+          try {
+            (window as any).gc();
+          } catch (e) {
+            // ignore
+          }
+        }
       });
     }
   }, [handleToggleLock, handleUpdateSettings]);
@@ -404,6 +416,35 @@ export default function App() {
                   ))}
                 </div>
               </div>
+
+              {/* 深度释放内存 */}
+              <button
+                onClick={() => {
+                  const api = (window as any).electronAPI;
+                  if (api?.trimMemory) {
+                    api.trimMemory();
+                  }
+                  if (typeof (window as any).gc === 'function') {
+                    try {
+                      (window as any).gc();
+                    } catch (e) {
+                      // ignore
+                    }
+                  }
+                }}
+                className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-100 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-[10px] font-bold">
+                    ⚡
+                  </div>
+                  <div>
+                    <div className="font-semibold text-slate-900">深度清理运行内存</div>
+                    <div className="text-[10px] text-slate-500">清除会话与 V8 垃圾缓存</div>
+                  </div>
+                </div>
+                <span className="text-[10px] text-blue-600 font-medium">释放</span>
+              </button>
 
               {/* 开机自启动 */}
               <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
